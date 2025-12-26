@@ -19,14 +19,6 @@ jobs:
         with:
           xcode-version: '16.1'
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Install Python dependencies
-        run: |
-          cd stt-server-py
-          uv sync
-
       - name: Build App for Release
         run: |
           xcodebuild -project SpeechToTextApp.xcodeproj \
@@ -34,14 +26,14 @@ jobs:
             -configuration Release \
             -destination 'platform=macOS' \
             -archivePath $RUNNER_TEMP/SpeechToTextApp.xcarchive \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
             archive
 
       - name: Export App
         run: |
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/SpeechToTextApp.xcarchive \
-            -exportPath $RUNNER_TEMP/export \
-            -exportOptionsPlist ExportOptions.plist || \
+          mkdir -p $RUNNER_TEMP/export
           cp -R $RUNNER_TEMP/SpeechToTextApp.xcarchive/Products/Applications/SpeechToTextApp.app $RUNNER_TEMP/export/
 
       - name: Create ZIP
@@ -63,7 +55,9 @@ jobs:
             ## Installation
 
             ### Homebrew (Recommended)
-            brew install --cask speechtotextapp
+            ```bash
+            brew install --cask uttr
+            ```
 
             ### Manual Download
             1. Download `SpeechToTextApp.zip` below

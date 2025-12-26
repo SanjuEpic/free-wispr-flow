@@ -51,9 +51,9 @@ Package the application for distribution beyond Xcode and establish GitHub best 
 - Cask formula includes: `depends_on formula: "uv"`
 
 ### Step 3: Homebrew Cask Formula Setup ✅ COMPLETE
-- File: `docs/homebrew/speechtotextapp.rb`
+- File: `docs/homebrew/uttr.rb`
 - Instructions included for creating a Homebrew tap
-- Requires creating `homebrew-speechtotextapp` repo on GitHub
+- Requires creating `homebrew-uttr` repo on GitHub
 
 ### Step 4: Update README.md ✅ COMPLETE
 - Rewritten to be concise and user-focused
@@ -150,7 +150,7 @@ jobs:
 
             ### Homebrew (Recommended)
             ```bash
-            brew install --cask speechtotextapp
+            brew install --cask uttr
             ```
 
             ### Manual Download
@@ -199,7 +199,7 @@ Speech To Text App/
 │       └── release.yml        ❌ Needs fix
 ├── docs/
 │   ├── homebrew/
-│   │   └── speechtotextapp.rb ✅ Complete
+│   │   └── uttr.rb ✅ Complete
 │   ├── architecture.md        ✅ Complete
 │   ├── configuration.md       ✅ Complete
 │   ├── CONTRIBUTING.md        ✅ Complete

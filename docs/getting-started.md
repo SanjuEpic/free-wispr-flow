@@ -7,8 +7,8 @@ This guide walks you through installing and setting up SpeechToTextApp.
 ### Option 1: Homebrew (Recommended)
 
 ```bash
-brew tap Rakk301/speechtotextapp
-brew install --cask speechtotextapp
+brew tap Rakk301/uttr
+brew install --cask uttr
 ```
 
 This automatically installs the app and its dependencies.

@@ -17,8 +17,8 @@ Runs locally using [OpenAI Whisper](https://github.com/openai/whisper) with opti
 ### Homebrew (Recommended)
 
 ```bash
-brew tap Rakk301/speechtotextapp
-brew install --cask speechtotextapp
+brew tap Rakk301/uttr
+brew install --cask uttr
 ```
 
 ### From Source
