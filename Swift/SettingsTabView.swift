@@ -29,20 +29,54 @@ struct SettingsTabView: View {
                 
                 // Basic Settings Section
                 VStack(alignment: .leading, spacing: 16) {
-                    // Model Setting
+                    // STT Provider Setting
                     SettingRow(
-                        label: "Model",
-                        description: "Choose the whisper model for transcription"
+                        label: "STT Provider",
+                        description: "Choose the speech-to-text engine"
                     ) {
-                        Picker("", selection: $settingsManager.whisperModel) {
-                            ForEach(settingsManager.availableModels, id: \.self) { model in
-                                Text(model.capitalized).tag(model)
-                            }
+                        Picker("", selection: $settingsManager.sttProvider) {
+                            Text("Whisper").tag("whisper")
+                            Text("Parakeet (Apple Silicon)").tag("parakeet")
                         }
                         .pickerStyle(MenuPickerStyle())
-                        .frame(width: 120)
-                        .onChange(of: settingsManager.whisperModel) { newValue in
-                            settingsManager.updateWhisperModel(newValue)
+                        .frame(width: 180)
+                        .onChange(of: settingsManager.sttProvider) { newValue in
+                            settingsManager.updateSTTProvider(newValue)
+                        }
+                    }
+                    
+                    // Model Setting - conditional based on provider
+                    if settingsManager.sttProvider == "whisper" {
+                        SettingRow(
+                            label: "Whisper Model",
+                            description: "Choose the whisper model size"
+                        ) {
+                            Picker("", selection: $settingsManager.whisperModel) {
+                                ForEach(settingsManager.availableWhisperModels, id: \.self) { model in
+                                    Text(model.capitalized).tag(model)
+                                }
+                            }
+                            .pickerStyle(MenuPickerStyle())
+                            .frame(width: 120)
+                            .onChange(of: settingsManager.whisperModel) { newValue in
+                                settingsManager.updateWhisperModel(newValue)
+                            }
+                        }
+                    } else if settingsManager.sttProvider == "parakeet" {
+                        SettingRow(
+                            label: "Parakeet Model",
+                            description: "MLX-optimized model for Apple Silicon"
+                        ) {
+                            Picker("", selection: $settingsManager.parakeetModel) {
+                                ForEach(settingsManager.availableParakeetModels, id: \.self) { model in
+                                    Text(model.split(separator: "/").last.map(String.init) ?? model).tag(model)
+                                }
+                            }
+                            .pickerStyle(MenuPickerStyle())
+                            .frame(width: 180)
+                            .onChange(of: settingsManager.parakeetModel) { newValue in
+                                settingsManager.updateParakeetModel(newValue)
+                            }
                         }
                     }
                     
@@ -160,61 +194,63 @@ struct SettingsTabView: View {
                     
                     if isDeveloperSettingsExpanded {
                         VStack(alignment: .leading, spacing: 20) {
-                            // Whisper Advanced Subsection
-                            DeveloperSubsection(
-                                title: "Whisper Advanced",
-                                icon: "waveform"
-                            ) {
-                                VStack(spacing: 12) {
-                                    // Task Setting
-                                    SettingRow(
-                                        label: "Task",
-                                        description: "Transcription task type"
-                                    ) {
-                                        Picker("", selection: $settingsManager.whisperTask) {
-                                            ForEach(["transcribe", "translate"], id: \.self) { task in
-                                                Text(task.capitalized).tag(task)
+                            // Whisper Advanced Subsection - only show when Whisper is selected
+                            if settingsManager.sttProvider == "whisper" {
+                                DeveloperSubsection(
+                                    title: "Whisper Advanced",
+                                    icon: "waveform"
+                                ) {
+                                    VStack(spacing: 12) {
+                                        // Task Setting
+                                        SettingRow(
+                                            label: "Task",
+                                            description: "Transcription task type"
+                                        ) {
+                                            Picker("", selection: $settingsManager.whisperTask) {
+                                                ForEach(["transcribe", "translate"], id: \.self) { task in
+                                                    Text(task.capitalized).tag(task)
+                                                }
+                                            }
+                                            .pickerStyle(MenuPickerStyle())
+                                            .frame(width: 140)
+                                            .onChange(of: settingsManager.whisperTask) { _ in
+                                                settingsManager.updateWhisperSettings()
                                             }
                                         }
-                                        .pickerStyle(MenuPickerStyle())
-                                        .frame(width: 140)
-                                        .onChange(of: settingsManager.whisperTask) { _ in
-                                            settingsManager.updateWhisperSettings()
-                                        }
-                                    }
-                                    
-                                    // Language Setting
-                                    SettingRow(
-                                        label: "Language",
-                                        description: "Audio language (auto-detect if not set)"
-                                    ) {
-                                        Picker("", selection: $settingsManager.whisperLanguage) {
-                                            ForEach(["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"], id: \.self) { language in
-                                                Text(languageDisplayName(language)).tag(language)
+                                        
+                                        // Language Setting
+                                        SettingRow(
+                                            label: "Language",
+                                            description: "Audio language (auto-detect if not set)"
+                                        ) {
+                                            Picker("", selection: $settingsManager.whisperLanguage) {
+                                                ForEach(["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"], id: \.self) { language in
+                                                    Text(languageDisplayName(language)).tag(language)
+                                                }
+                                            }
+                                            .pickerStyle(MenuPickerStyle())
+                                            .frame(width: 140)
+                                            .onChange(of: settingsManager.whisperLanguage) { _ in
+                                                settingsManager.updateWhisperSettings()
                                             }
                                         }
-                                        .pickerStyle(MenuPickerStyle())
-                                        .frame(width: 140)
-                                        .onChange(of: settingsManager.whisperLanguage) { _ in
-                                            settingsManager.updateWhisperSettings()
-                                        }
-                                    }
-                                    
-                                    // Temperature Setting
-                                    SettingRow(
-                                        label: "Temperature",
-                                        description: "Sampling temperature (0.0 to 1.0)"
-                                    ) {
-                                        HStack {
-                                            Slider(value: $settingsManager.whisperTemperature, in: 0...1, step: 0.1)
+                                        
+                                        // Temperature Setting
+                                        SettingRow(
+                                            label: "Temperature",
+                                            description: "Sampling temperature (0.0 to 1.0)"
+                                        ) {
+                                            HStack {
+                                                Slider(value: $settingsManager.whisperTemperature, in: 0...1, step: 0.1)
 
-                                            Text(String(format: "%.1f", settingsManager.whisperTemperature))
-                                                .font(.system(.body, design: .monospaced))
-                                                .foregroundColor(.secondary)
-                                                .frame(width: 30)
-                                        }
-                                        .onChange(of: settingsManager.whisperTemperature) { _ in
-                                            settingsManager.updateWhisperSettings()
+                                                Text(String(format: "%.1f", settingsManager.whisperTemperature))
+                                                    .font(.system(.body, design: .monospaced))
+                                                    .foregroundColor(.secondary)
+                                                    .frame(width: 30)
+                                            }
+                                            .onChange(of: settingsManager.whisperTemperature) { _ in
+                                                settingsManager.updateWhisperSettings()
+                                            }
                                         }
                                     }
                                 }

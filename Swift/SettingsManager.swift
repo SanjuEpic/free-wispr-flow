@@ -4,6 +4,14 @@ import Yams
 import Carbon
 
 // MARK: - Configuration Models
+struct STTConfig: Codable {
+    var provider: String
+    
+    enum CodingKeys: String, CodingKey {
+        case provider
+    }
+}
+
 struct WhisperConfig: Codable {
     var model: String
     var task: String
@@ -15,6 +23,14 @@ struct WhisperConfig: Codable {
         case task
         case language
         case temperature
+    }
+}
+
+struct ParakeetConfig: Codable {
+    var model: String
+    
+    enum CodingKeys: String, CodingKey {
+        case model
     }
 }
 
@@ -41,7 +57,9 @@ struct ServerConfig: Codable {
 }
 
 struct AppConfig: Codable {
+    var stt: STTConfig?
     var whisper: WhisperConfig
+    var parakeet: ParakeetConfig?
     var hotkey: HotkeyConfig
     var server: ServerConfig?
 }
@@ -54,16 +72,19 @@ extension Notification.Name {
     static let whisperSettingsChanged = Notification.Name("whisperSettingsChanged")
     static let serverSettingsChanged = Notification.Name("serverSettingsChanged")
     static let whisperModelReloaded = Notification.Name("whisperModelReloaded")
+    static let sttProviderChanged = Notification.Name("sttProviderChanged")
 }
 
 // MARK: - Settings Manager
 class SettingsManager: ObservableObject {
     
     // MARK: - Published Properties
+    @Published var sttProvider: String = "whisper"
     @Published var whisperModel: String = "small"
     @Published var whisperTask: String = "transcribe"
     @Published var whisperLanguage: String = "auto"
     @Published var whisperTemperature: Float = 0.0
+    @Published var parakeetModel: String = "mlx-community/parakeet-tdt-0.6b-v3"
     @Published var hotkeyKeyCode: Int = 37  // L key
     @Published var hotkeyModifiers: [String] = ["option"]
     
@@ -78,7 +99,9 @@ class SettingsManager: ObservableObject {
     private let logger = Logger()
     
     // Available options
-    let availableModels = ["tiny", "base", "small", "medium", "large"]
+    let availableProviders = ["whisper", "parakeet"]
+    let availableWhisperModels = ["tiny", "base", "small", "medium", "large"]
+    let availableParakeetModels = ["mlx-community/parakeet-tdt-0.6b-v3"]
     
     // MARK: - Initialization
     init() {
@@ -119,12 +142,14 @@ class SettingsManager: ObservableObject {
         
         do {
             let config = AppConfig(
+                stt: STTConfig(provider: sttProvider),
                 whisper: WhisperConfig(
                     model: whisperModel,
                     task: whisperTask,
                     language: whisperLanguage,
                     temperature: whisperTemperature
                 ),
+                parakeet: ParakeetConfig(model: parakeetModel),
                 hotkey: HotkeyConfig(keyCode: hotkeyKeyCode, modifiers: hotkeyModifiers)
             )
             
@@ -163,6 +188,19 @@ class SettingsManager: ObservableObject {
         saveSettings()
     }
     
+    func updateSTTProvider(_ provider: String) {
+        sttProvider = provider
+        NotificationCenter.default.post(name: .sttProviderChanged, object: self)
+        logger.log("STT provider changed to: \(provider)", level: .info)
+        saveSettings()
+    }
+    
+    func updateParakeetModel(_ model: String) {
+        parakeetModel = model
+        logger.log("Parakeet model changed to: \(model)", level: .info)
+        saveSettings()
+    }
+    
     // MARK: - Utility Methods
     func getHotkeyDisplayString() -> String {
         var display = ""
@@ -186,11 +224,21 @@ class SettingsManager: ObservableObject {
         let decoder = YAMLDecoder()
         let config = try decoder.decode(AppConfig.self, from: yamlString)
         
+        // Load STT provider configuration
+        if let stt = config.stt {
+            sttProvider = stt.provider
+        }
+        
         // Load whisper configuration
         whisperModel = config.whisper.model
         whisperTask = config.whisper.task
         whisperLanguage = config.whisper.language
         whisperTemperature = config.whisper.temperature
+        
+        // Load parakeet configuration
+        if let parakeet = config.parakeet {
+            parakeetModel = parakeet.model
+        }
         
         // Load hotkey configuration
         hotkeyKeyCode = config.hotkey.keyCode
@@ -207,10 +255,12 @@ class SettingsManager: ObservableObject {
     }
     
     private func setDefaultSettings() {
+        sttProvider = "whisper"
         whisperModel = "small"
         whisperTask = "transcribe"
         whisperLanguage = "auto"
         whisperTemperature = 0.0
+        parakeetModel = "mlx-community/parakeet-tdt-0.6b-v3"
         hotkeyKeyCode = 37  // L key
         hotkeyModifiers = ["option"]
         logger.log("Default settings applied", level: .info)
