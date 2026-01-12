@@ -1,6 +1,7 @@
 from typing import Dict, Any
 from base_STTProvider import BaseSTTProvider
 from whisper_STTProvider import WhisperProvider
+from parakeet_STTProvider import ParakeetProvider
 
 
 class STT:
@@ -11,5 +12,7 @@ class STT:
         """Create STT provider based on type."""
         if provider_type == "whisper":
             return WhisperProvider(config)
+        elif provider_type == "parakeet":
+            return ParakeetProvider(config)
         else:
             raise ValueError(f"Unknown STT provider: {provider_type}")

@@ -57,4 +57,9 @@ class Config:
     def stt(self) -> Dict[str, Any]:
         """Get STT configuration."""
         return self.config.get("stt", {})
+    
+    @property
+    def parakeet(self) -> Dict[str, Any]:
+        """Get Parakeet configuration."""
+        return self.config.get("parakeet", {})
         

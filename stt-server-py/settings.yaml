@@ -25,6 +25,10 @@ whisper:
   task: "transcribe"
   temperature: 0.0
 
+# Parakeet Settings (MLX-optimized for Apple Silicon)
+parakeet:
+  model: "mlx-community/parakeet-tdt-0.6b-v3"
+
 # LLM Settings
 llm:
   base_url: "http://localhost:11434"

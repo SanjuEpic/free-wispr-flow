@@ -12,6 +12,7 @@ from stt import STT
 from llm_processor import LLMProcessor
 from config import Config
 from whisper_STTProvider import WhisperProvider
+from parakeet_STTProvider import ParakeetProvider
 
 
 class MultiModelTranscriptionServer:
@@ -30,6 +31,8 @@ class MultiModelTranscriptionServer:
         # Get provider-specific config
         if primary_provider == "whisper":
             provider_config = self.config.whisper
+        elif primary_provider == "parakeet":
+            provider_config = self.config.parakeet
         else:
             provider_config = {}
         
@@ -86,12 +89,16 @@ class MultiModelTranscriptionServer:
         """Get current provider type."""
         if isinstance(self.stt_provider, WhisperProvider):
             return "whisper"
+        elif isinstance(self.stt_provider, ParakeetProvider):
+            return "parakeet"
         return "unknown"
     
     def _get_provider_config(self, provider: str) -> Dict[str, Any]:
         """Get configuration for specific provider."""
         if provider == "whisper":
             return self.config.whisper
+        elif provider == "parakeet":
+            return self.config.parakeet
         return {}
     
     async def providers_handler(self, request):
@@ -100,6 +107,10 @@ class MultiModelTranscriptionServer:
             "whisper": {
                 "available": True,  # Always available (local)
                 "description": "Local Whisper model"
+            },
+            "parakeet": {
+                "available": True,  # Always available (local, MLX-optimized)
+                "description": "Parakeet MLX model (Apple Silicon optimized)"
             },
         }
         
