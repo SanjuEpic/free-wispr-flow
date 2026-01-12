@@ -23,7 +23,7 @@ cask "uttr" do
   depends_on formula: "uv"
   depends_on macos: ">= :sonoma"
 
-  app "SpeechToTextApp.app"
+  app "uttr.app"
 
   caveats <<~EOS
     On first launch, you may need to allow the app in:
@@ -35,6 +35,6 @@ cask "uttr" do
   EOS
 
   zap trash: [
-    "~/Library/Application Support/SpeechToTextApp",
+    "~/Library/Application Support/uttr",
   ]
 end

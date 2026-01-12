@@ -22,8 +22,8 @@ jobs:
 
       - name: Build App
         run: |
-          xcodebuild -project SpeechToTextApp.xcodeproj \
-            -scheme SpeechToTextApp \
+          xcodebuild -project uttr.xcodeproj \
+            -scheme uttr \
             -configuration Release \
             -destination 'platform=macOS' \
             CODE_SIGN_IDENTITY="-" \
