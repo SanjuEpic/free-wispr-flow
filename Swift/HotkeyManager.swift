@@ -85,6 +85,38 @@ class HotkeyManager {
             logger.logError(error, context: "Failed to register global hotkey")
             if let error = error as? HotkeyManagerError, case .permissionDenied = error {
                 logAccessibilityInstructions()
+                // Start polling for permission grant
+                startAccessibilityPermissionPolling()
+            }
+        }
+    }
+    
+    // MARK: - Accessibility Polling
+    private var permissionPollingTimer: Timer?
+    
+    private func startAccessibilityPermissionPolling() {
+        // Poll every 2 seconds to check if user granted permission
+        permissionPollingTimer?.invalidate()
+        permissionPollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] timer in
+            guard let self = self else {
+                timer.invalidate()
+                return
+            }
+            
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): kCFBooleanFalse]
+            let isTrusted = AXIsProcessTrustedWithOptions(options as CFDictionary)
+            
+            if isTrusted {
+                self.logger.log("[HotkeyManager] Accessibility permission granted! Registering global hotkey...", level: .info)
+                timer.invalidate()
+                self.permissionPollingTimer = nil
+                
+                // Re-attempt to register global hotkey
+                do {
+                    try self.setupGlobalHotkey()
+                } catch {
+                    self.logger.logError(error, context: "Failed to register global hotkey after permission grant")
+                }
             }
         }
     }
@@ -212,13 +244,27 @@ class HotkeyManager {
     }
     
     private func checkAccessibilityPermissions() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): kCFBooleanFalse]
-        return AXIsProcessTrustedWithOptions(options as CFDictionary)
+        // First check without prompting
+        let checkOptions = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): kCFBooleanFalse]
+        let isTrusted = AXIsProcessTrustedWithOptions(checkOptions as CFDictionary)
+        
+        if !isTrusted {
+            // Prompt the user to grant permissions
+            logger.log("[HotkeyManager] Accessibility not granted, prompting user...", level: .info)
+            let promptOptions = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): kCFBooleanTrue]
+            _ = AXIsProcessTrustedWithOptions(promptOptions as CFDictionary)
+        }
+        
+        return isTrusted
     }
     
     // MARK: - Cleanup
     private func cleanup() {
         logger.log("[HotkeyManager] Cleaning up hotkey resources", level: .debug)
+        
+        // Stop permission polling timer
+        permissionPollingTimer?.invalidate()
+        permissionPollingTimer = nil
         
         // Clean up global hotkey
         if let hotkeyRef = hotkeyRef {
