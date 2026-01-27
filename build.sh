@@ -11,23 +11,27 @@ NC='\033[0m' # No Color
 CONFIGURATION="Release"
 CLEAN=false
 OPEN_APP=false
+UPDATE_DEPS=false
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVER_DIR="$PROJECT_DIR/stt-server-py"
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "Build the uttr without Xcode"
+    echo "Build uttr from source with Python dependency management"
     echo ""
     echo "Options:"
     echo "  -c, --configuration  Build configuration: Debug or Release (default: Release)"
     echo "  -C, --clean          Clean build folder before building"
-    echo "  -o, --open           Open the app after successful build"
+    echo "  -o, --open           Open app after successful build"
+    echo "  -u, --update-deps    Update Python dependencies before building"
     echo "  -h, --help           Show this help message"
     echo ""
     echo "Examples:"
     echo "  $0                   # Release build"
     echo "  $0 -c Debug          # Debug build"
     echo "  $0 --clean --open    # Clean Release build, then open app"
+    echo "  $0 --update-deps     # Update Python dependencies then build"
 }
 
 # Parse arguments
@@ -43,6 +47,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -o|--open)
             OPEN_APP=true
+            shift
+            ;;
+        -u|--update-deps)
+            UPDATE_DEPS=true
             shift
             ;;
         -h|--help)
@@ -64,6 +72,32 @@ if [[ "$CONFIGURATION" != "Debug" && "$CONFIGURATION" != "Release" ]]; then
     exit 1
 fi
 
+# Check/update Python dependencies
+if [ "$UPDATE_DEPS" = true ]; then
+    echo -e "${BLUE}=== Python Dependencies ===${NC}"
+    
+    # Check if uv is installed
+    if ! command -v uv &> /dev/null; then
+        echo -e "${RED}uv not found. Installing uv...${NC}"
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="$HOME/.cargo/bin:$PATH"
+    else
+        echo -e "${GREEN}uv found: $(uv --version)${NC}"
+    fi
+    
+    # Update dependencies
+    if [ -d "$SERVER_DIR" ]; then
+        echo -e "${YELLOW}Updating Python dependencies...${NC}"
+        cd "$SERVER_DIR"
+        uv sync --upgrade
+        echo -e "${GREEN}Python dependencies updated${NC}"
+        cd "$PROJECT_DIR"
+    else
+        echo -e "${YELLOW}Warning: stt-server-py directory not found${NC}"
+    fi
+    echo ""
+fi
+
 cd "$PROJECT_DIR"
 
 echo -e "${GREEN}=== uttr Build ===${NC}"
@@ -76,6 +110,7 @@ if [ "$CLEAN" = true ]; then
     xcodebuild -project uttr.xcodeproj \
         -scheme uttr \
         -configuration "$CONFIGURATION" \
+        -destination 'platform=macOS,arch=arm64' \
         clean
     echo ""
 fi
@@ -85,7 +120,7 @@ echo -e "${YELLOW}Building...${NC}"
 xcodebuild -project uttr.xcodeproj \
     -scheme uttr \
     -configuration "$CONFIGURATION" \
-    -destination 'platform=macOS' \
+    -destination 'platform=macOS,arch=arm64' \
     CODE_SIGN_IDENTITY="-" \
     CODE_SIGNING_REQUIRED=NO \
     CODE_SIGNING_ALLOWED=NO \
@@ -98,16 +133,26 @@ BUILD_DIR=$(xcodebuild -project uttr.xcodeproj \
     -showBuildSettings 2>/dev/null | grep -m1 "BUILT_PRODUCTS_DIR" | awk '{print $3}')
 
 APP_PATH="$BUILD_DIR/uttr.app"
+FINAL_APP_PATH="/Applications/uttr.app"
 
 echo ""
 echo -e "${GREEN}=== Build Successful ===${NC}"
-echo -e "App location: ${YELLOW}$APP_PATH${NC}"
+echo -e "Built app: ${YELLOW}$APP_PATH${NC}"
+
+# Copy to Applications folder
+echo -e "${YELLOW}Installing to Applications folder...${NC}"
+if [ -d "$FINAL_APP_PATH" ]; then
+    echo -e "${YELLOW}Removing existing installation...${NC}"
+    rm -rf "$FINAL_APP_PATH"
+fi
+cp -R "$APP_PATH" "$FINAL_APP_PATH"
+echo -e "${GREEN}Installed: ${YELLOW}$FINAL_APP_PATH${NC}"
 
 # Open if requested
 if [ "$OPEN_APP" = true ]; then
-    if [ -d "$APP_PATH" ]; then
+    if [ -d "$FINAL_APP_PATH" ]; then
         echo -e "${YELLOW}Opening app...${NC}"
-        open "$APP_PATH"
+        open "$FINAL_APP_PATH"
     else
         echo -e "${RED}App not found at expected location${NC}"
         exit 1
