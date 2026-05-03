@@ -9,7 +9,6 @@ from aiohttp import web
 from typing import Dict, Any
 
 from stt import STT
-from llm_processor import LLMProcessor
 from config import Config
 from whisper_STTProvider import WhisperProvider
 from parakeet_STTProvider import ParakeetProvider
@@ -19,7 +18,6 @@ class MultiModelTranscriptionServer:
     def __init__(self, config_path: str):
         self.config = Config(config_path)
         self.stt_provider = None
-        self.llm = None
         self.logger = logging.getLogger(__name__)
         
     async def initialize_models(self):
@@ -39,11 +37,6 @@ class MultiModelTranscriptionServer:
         # Create STT provider with fallback
         self.logger.info(f"Initializing STT provider: {primary_provider}")
         self.stt_provider = STT.create_provider(primary_provider, provider_config)
-        
-        # Initialize LLM if enabled
-        if self.config.llm.get("enabled", True):
-            self.logger.info("Loading LLM processor...")
-            self.llm = LLMProcessor(self.config.llm)
         
         self.logger.info("All models loaded successfully")
     
@@ -142,75 +135,6 @@ class MultiModelTranscriptionServer:
                 status=500
             )
     
-    # Default transform prompts (used when not configured in settings.yaml)
-    DEFAULT_TRANSFORM_PROMPTS = {
-        'bullets': """Convert the following text into clear, concise bullet points.
-Preserve all key details but improve clarity and remove filler words.
-Do not add any preamble or explanation - output only the bullet points.
-Use "•" as the bullet character.
-
-Text: {text}"""
-    }
-    
-    async def transform_handler(self, request):
-        """Transform text using LLM with specified mode."""
-        try:
-            data = await request.json()
-            text = data.get('text')
-            mode = data.get('mode', 'bullets')
-            
-            if not text:
-                return web.json_response(
-                    {'error': 'No text provided'}, 
-                    status=400
-                )
-            
-            # Get transform modes from config, with built-in defaults as fallback
-            transform_config = self.config.transform
-            modes = transform_config.get('modes', {})
-            
-            # Check config first, then fall back to built-in defaults
-            if mode in modes:
-                mode_config = modes[mode]
-                prompt_template = mode_config.get('prompt', '{text}')
-            elif mode in self.DEFAULT_TRANSFORM_PROMPTS:
-                prompt_template = self.DEFAULT_TRANSFORM_PROMPTS[mode]
-                self.logger.info(f"Using built-in default prompt for mode: {mode}")
-            else:
-                available = list(set(modes.keys()) | set(self.DEFAULT_TRANSFORM_PROMPTS.keys()))
-                return web.json_response(
-                    {'error': f'Unknown transform mode: {mode}. Available: {available}'}, 
-                    status=400
-                )
-            
-            if not self.llm:
-                return web.json_response(
-                    {'error': 'LLM processor not available'}, 
-                    status=503
-                )
-            
-            # Create a temporary LLM config with the mode's prompt
-            original_prompt = self.llm.config.get('prompt')
-            self.llm.config['prompt'] = prompt_template
-            
-            self.logger.info(f"Transforming text with mode: {mode}")
-            transformed = self.llm.process(text)
-            
-            # Restore original prompt
-            self.llm.config['prompt'] = original_prompt
-            
-            return web.json_response({
-                'transformed': transformed,
-                'mode': mode
-            })
-            
-        except Exception as e:
-            self.logger.error(f"Transform failed: {e}")
-            return web.json_response(
-                {'error': str(e)}, 
-                status=500
-            )
-        
     async def reload_model_handler(self, request):
         """Reload Whisper model with new configuration without server restart."""
         try:
@@ -259,7 +183,6 @@ async def create_app(config_path: str) -> web.Application:
     
     app = web.Application()
     app.router.add_post('/transcribe', server.transcribe_handler)
-    app.router.add_post('/transform', server.transform_handler)
     app.router.add_get('/providers', server.providers_handler)
     app.router.add_post('/switch_provider', server.switch_provider_handler)
     app.router.add_post('/reload_model', server.reload_model_handler)
@@ -300,7 +223,6 @@ async def main():
     print(f"🚀 Transcription server started on http://{args.host}:{args.port}")
     print("📋 Available endpoints:")
     print("  POST /transcribe      - Transcribe audio file")
-    print("  POST /transform       - Transform text with LLM (modes: bullets, etc.)")
     print("  GET  /providers       - List available providers")
     print("  POST /switch_provider - Switch STT provider")
     print("  POST /reload_model    - Reload Whisper model")
@@ -308,8 +230,6 @@ async def main():
     print("\n💡 Test with Postman:")
     print("  POST http://localhost:8080/transcribe")
     print("  Body: {\"audio_path\": \"/path/to/audio.wav\"}")
-    print("\n  POST http://localhost:8080/transform")
-    print("  Body: {\"text\": \"your text here\", \"mode\": \"bullets\"}")
     
     # Keep server running
     try:

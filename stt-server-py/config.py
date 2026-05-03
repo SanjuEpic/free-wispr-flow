@@ -44,11 +44,6 @@ class Config:
         return self.config.get("whisper", {})
     
     @property
-    def llm(self) -> Dict[str, Any]:
-        """Get LLM configuration."""
-        return self.config.get("llm", {})
-    
-    @property
     def audio(self) -> Dict[str, Any]:
         """Get audio configuration."""
         return self.config.get("audio", {})
@@ -63,8 +58,3 @@ class Config:
         """Get Parakeet configuration."""
         return self.config.get("parakeet", {})
     
-    @property
-    def transform(self) -> Dict[str, Any]:
-        """Get Transform configuration."""
-        return self.config.get("transform", {})
-        

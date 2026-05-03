@@ -81,9 +81,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         hotkeyManager?.onTranscribeHotkeyPressed = { [weak self] in
             self?.handleTranscribeHotkeyPress()
         }
-        hotkeyManager?.onTransformHotkeyPressed = { [weak self] in
-            self?.handleTransformHotkeyPress()
-        }
         
         // Initialize menu bar popover view
         menuBarPopoverView = MenuBarPopoverView()
@@ -213,11 +210,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         }
     }
     
-    private func handleTransformHotkeyPress() {
-        logger?.log("Transform hotkey pressed", level: .info)
-        transformClipboardContent()
-    }
-    
     private func startRecording() {
         guard !isRecording else { return }
         
@@ -293,57 +285,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
                 } else {
                     self?.logger?.log("Failed to paste text at cursor", level: .error)
                     self?.notificationManager?.showTranscriptionError("Failed to paste text at cursor")
-                    self?.menuBarIconManager?.showErrorState()
-                }
-            }
-        }
-    }
-    
-    // MARK: - Transform Flow
-    private func transformClipboardContent() {
-        // Read text from clipboard
-        let pasteboard = NSPasteboard.general
-        guard let clipboardText = pasteboard.string(forType: .string), !clipboardText.isEmpty else {
-            logger?.log("No text in clipboard to transform", level: .warning)
-            notificationManager?.showTranscriptionError("No text in clipboard")
-            menuBarIconManager?.showErrorState()
-            return
-        }
-        
-        logger?.log("Transforming clipboard text: \(clipboardText.prefix(50))...", level: .info)
-        menuBarIconManager?.setTransformingState()
-        
-        // Get the default transform mode from settings
-        let mode = settingsManager?.transformDefaultMode ?? "bullets"
-        
-        transcriptionClient?.transformText(clipboardText, mode: mode) { [weak self] result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let transformedText):
-                    self?.logger?.log("Transform completed successfully", level: .info)
-                    self?.handleTransformedText(transformedText)
-                case .failure(let error):
-                    self?.logger?.logError(error, context: "Transform failed")
-                    self?.notificationManager?.showTranscriptionError("Transform failed: \(error.localizedDescription)")
-                    self?.menuBarIconManager?.showErrorState()
-                }
-            }
-        }
-    }
-    
-    private func handleTransformedText(_ text: String) {
-        logger?.log("Handling transformed text", level: .info)
-        
-        // Paste the transformed text at cursor
-        pasteManager?.pasteText(text) { [weak self] success in
-            DispatchQueue.main.async {
-                if success {
-                    self?.logger?.log("Transformed text pasted successfully", level: .info)
-                    self?.notificationManager?.showTranscriptionSuccess()
-                    self?.menuBarIconManager?.showSuccessState()
-                } else {
-                    self?.logger?.log("Failed to paste transformed text", level: .error)
-                    self?.notificationManager?.showTranscriptionError("Failed to paste transformed text")
                     self?.menuBarIconManager?.showErrorState()
                 }
             }

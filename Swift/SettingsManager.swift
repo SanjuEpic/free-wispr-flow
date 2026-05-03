@@ -44,26 +44,6 @@ struct HotkeyConfig: Codable {
     }
 }
 
-struct TransformHotkeyConfig: Codable {
-    var keyCode: Int
-    var modifiers: [String]
-    
-    enum CodingKeys: String, CodingKey {
-        case keyCode = "key_code"
-        case modifiers
-    }
-}
-
-struct TransformConfig: Codable {
-    var defaultMode: String
-    var hotkey: TransformHotkeyConfig
-    
-    enum CodingKeys: String, CodingKey {
-        case defaultMode = "default_mode"
-        case hotkey
-    }
-}
-
 struct ServerConfig: Codable {
     var host: String
     var port: Int
@@ -81,7 +61,6 @@ struct AppConfig: Codable {
     var whisper: WhisperConfig
     var parakeet: ParakeetConfig?
     var hotkey: HotkeyConfig
-    var transform: TransformConfig?
     var server: ServerConfig?
 }
 
@@ -90,7 +69,6 @@ extension Notification.Name {
     static let whisperModelChanged = Notification.Name("whisperModelChanged")
     static let hotkeyChanged = Notification.Name("hotkeyChanged")
     static let hotkeySettingsChanged = Notification.Name("hotkeySettingsChanged")
-    static let transformHotkeyChanged = Notification.Name("transformHotkeyChanged")
     static let whisperSettingsChanged = Notification.Name("whisperSettingsChanged")
     static let serverSettingsChanged = Notification.Name("serverSettingsChanged")
     static let whisperModelReloaded = Notification.Name("whisperModelReloaded")
@@ -109,12 +87,7 @@ class SettingsManager: ObservableObject {
     @Published var parakeetModel: String = "mlx-community/parakeet-tdt-0.6b-v3"
     @Published var hotkeyKeyCode: Int = 37  // L key
     @Published var hotkeyModifiers: [String] = ["option"]
-    
-    // Transform hotkey configuration
-    @Published var transformHotkeyKeyCode: Int = 1  // S key
-    @Published var transformHotkeyModifiers: [String] = ["option"]
-    @Published var transformDefaultMode: String = "bullets"
-    
+
     // Server configuration
     var serverHost: String = "localhost"
     var serverPort: Int = 3001
@@ -177,11 +150,7 @@ class SettingsManager: ObservableObject {
                     temperature: whisperTemperature
                 ),
                 parakeet: ParakeetConfig(model: parakeetModel),
-                hotkey: HotkeyConfig(keyCode: hotkeyKeyCode, modifiers: hotkeyModifiers),
-                transform: TransformConfig(
-                    defaultMode: transformDefaultMode,
-                    hotkey: TransformHotkeyConfig(keyCode: transformHotkeyKeyCode, modifiers: transformHotkeyModifiers)
-                )
+                hotkey: HotkeyConfig(keyCode: hotkeyKeyCode, modifiers: hotkeyModifiers)
             )
             
             let encoder = YAMLEncoder()
@@ -214,27 +183,6 @@ class SettingsManager: ObservableObject {
         saveSettings()
     }
     
-    func updateTransformHotkey(keyCode: Int, modifiers: [String]) {
-        transformHotkeyKeyCode = keyCode
-        transformHotkeyModifiers = modifiers
-        NotificationCenter.default.post(name: .transformHotkeyChanged, object: self)
-        logger.log("Transform hotkey changed", level: .info)
-        saveSettings()
-    }
-    
-    func getTransformHotkeyDisplayString() -> String {
-        var display = ""
-        if transformHotkeyModifiers.contains("command") { display += "⌘" }
-        if transformHotkeyModifiers.contains("shift") { display += "⇧" }
-        if transformHotkeyModifiers.contains("option") { display += "⌥" }
-        if transformHotkeyModifiers.contains("control") { display += "⌃" }
-
-        let keyChar = keyCodeToCharacter(transformHotkeyKeyCode)
-        display += keyChar
-
-        return display
-    }
-
     func updateWhisperSettings() {
         NotificationCenter.default.post(name: .whisperSettingsChanged, object: self)
         saveSettings()
@@ -295,14 +243,7 @@ class SettingsManager: ObservableObject {
         // Load hotkey configuration
         hotkeyKeyCode = config.hotkey.keyCode
         hotkeyModifiers = config.hotkey.modifiers
-        
-        // Load transform configuration
-        if let transform = config.transform {
-            transformDefaultMode = transform.defaultMode
-            transformHotkeyKeyCode = transform.hotkey.keyCode
-            transformHotkeyModifiers = transform.hotkey.modifiers
-        }
-        
+
         // Load server configuration
         if let server = config.server {
             serverHost = server.host
@@ -322,9 +263,6 @@ class SettingsManager: ObservableObject {
         parakeetModel = "mlx-community/parakeet-tdt-0.6b-v3"
         hotkeyKeyCode = 37  // L key
         hotkeyModifiers = ["option"]
-        transformHotkeyKeyCode = 1  // S key
-        transformHotkeyModifiers = ["option"]
-        transformDefaultMode = "bullets"
         logger.log("Default settings applied", level: .info)
     }
 

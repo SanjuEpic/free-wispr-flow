@@ -29,27 +29,10 @@ whisper:
 parakeet:
   model: "mlx-community/parakeet-tdt-0.6b-v3"
 
-# LLM Settings (used by /transform endpoint, not during transcription)
-llm:
-  base_url: "http://localhost:11434"
-  enabled: true
-  model: "llama3.2-3b"
-  temperature: 0.1
-  max_tokens: 500
-
 # Hotkey Settings
 hotkey:
   key_code: 37  # L key
   modifiers: ["option"]
-
-# Transform Settings
-# Prompts are defined as built-in defaults in transcription_server.py
-# TODO-Shishir-P3: Add UI for editing transform modes and custom prompts
-transform:
-  default_mode: "bullets"
-  hotkey:
-    key_code: 1  # S key
-    modifiers: ["option"]
 
 # Logging Settings
 logging:
