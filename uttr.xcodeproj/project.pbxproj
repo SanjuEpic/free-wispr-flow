@@ -343,7 +343,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "uttr-Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = uttr;
+				INFOPLIST_KEY_CFBundleDisplayName = "uttr (dev)";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
