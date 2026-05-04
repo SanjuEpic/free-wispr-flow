@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import FluidAudio
 
@@ -57,13 +58,20 @@ struct Benchmark {
         for path in audioPaths {
             let url = URL(fileURLWithPath: path)
             printErr("Transcribing \(url.lastPathComponent)…")
+
+            // Measure duration independently — ASRResult.duration is 0 on the streaming
+            // path (files > 30s), so we read it from the file header directly.
+            let audioFile = try AVAudioFile(forReading: url)
+            let duration = Double(audioFile.length) / audioFile.processingFormat.sampleRate
+
             var state = TdtDecoderState.make()
             let r = try await asr.transcribe(url, decoderState: &state)
+            let rtfx = Float(duration / r.processingTime)
             rows.append(BenchRow(
                 clip: url.lastPathComponent,
-                duration: r.duration,
+                duration: duration,
                 processing: r.processingTime,
-                rtfx: r.rtfx,
+                rtfx: rtfx,
                 transcript: r.text
             ))
         }
