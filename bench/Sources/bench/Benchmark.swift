@@ -26,25 +26,29 @@ struct Benchmark {
         let args = Array(CommandLine.arguments.dropFirst())
         var version: AsrModelVersion = .v3
         var markdown = false
+        var tsv = false
         var audioPaths: [String] = []
 
         var i = 0
         while i < args.count {
             switch args[i] {
-            case "--v2":      version = .v2
-            case "--v3":      version = .v3
+            case "--v2":       version = .v2
+            case "--v3":       version = .v3
             case "--markdown": markdown = true
-            default:          audioPaths.append(args[i])
+            case "--tsv":      tsv = true
+            default:           audioPaths.append(args[i])
             }
             i += 1
         }
 
         guard !audioPaths.isEmpty else {
-            fputs("usage: bench [--v2|--v3] [--markdown] <clip.aiff> ...\n", stderr)
+            fputs("usage: bench [--v2|--v3] [--markdown|--tsv] <clip.aiff> ...\n", stderr)
             exit(1)
         }
 
-        let versionLabel = version == .v3 ? "Parakeet v3 (multilingual)" : "Parakeet v2 (English)"
+        let versionLabel = version == .v3
+            ? "Parakeet v3 (FluidAudio/ANE)"
+            : "Parakeet v2 (FluidAudio/ANE)"
 
         // Warm load — assumes models are already downloaded
         printErr("Loading \(versionLabel) from cache…")
@@ -76,7 +80,9 @@ struct Benchmark {
             ))
         }
 
-        if markdown {
+        if tsv {
+            printTSV(version: versionLabel, rows: rows)
+        } else if markdown {
             printMarkdown(version: versionLabel, loadTime: loadTime, rows: rows)
         } else {
             printTable(version: versionLabel, loadTime: loadTime, rows: rows)
@@ -85,6 +91,14 @@ struct Benchmark {
 }
 
 // MARK: - Output
+
+// TSV format: model \t clip \t duration \t inferTime \t rtfx
+// Used by run.sh to assemble the combined comparison table.
+private func printTSV(version: String, rows: [BenchRow]) {
+    for r in rows {
+        print("\(version)\t\(r.clip)\t\(String(format: "%.1f", r.duration))\t\(String(format: "%.2f", r.processing))\t\(String(format: "%.1f", r.rtfx))")
+    }
+}
 
 private func printTable(version: String, loadTime: Double, rows: [BenchRow]) {
     let divider = String(repeating: "─", count: 88)

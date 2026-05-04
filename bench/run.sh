@@ -1,29 +1,36 @@
 #!/usr/bin/env bash
-# bench/run.sh  —  generate test audio clips and run the benchmark
+# bench/run.sh  —  4-model transcription speed comparison
+#
+# Models:
+#   Python sidecar (baseline):  Whisper tiny  ·  Parakeet MLX
+#   FluidAudio / ANE (new):     Parakeet v2   ·  Parakeet v3  ← default
 #
 # Usage:
-#   ./bench/run.sh                    # table output, Parakeet v3
-#   ./bench/run.sh --v2               # use Parakeet v2
+#   ./bench/run.sh                    # table output
 #   ./bench/run.sh --markdown         # GitHub-flavoured markdown (paste into PR)
-#   ./bench/run.sh --cold             # delete cached models first (measures cold load)
-#   ./bench/run.sh path/to/clip.aiff  # benchmark a specific file instead
-#
-# Requires: Xcode CLI tools, uv (for macOS say; always present)
-# Models must be downloaded at least once before running (cold flag will do it).
+#   ./bench/run.sh --cold             # wipe FluidAudio model cache first
+#   ./bench/run.sh --fluid-only       # skip Python sidecar benchmarks
+#   ./bench/run.sh path/to/clip.aiff  # benchmark a specific file
 
 set -euo pipefail
 
 BENCH_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$BENCH_DIR/.." && pwd)"
 AUDIO_DIR="$BENCH_DIR/audio"
-BENCH_ARGS=()
-CUSTOM_FILES=()
+SIDECAR_DIR="$REPO_DIR/stt-server-py"
+
+MARKDOWN=false
 COLD=false
+FLUID_ONLY=false
+CUSTOM_FILES=()
 
 for arg in "$@"; do
     case "$arg" in
-        --cold)    COLD=true ;;
-        --v2|--v3|--markdown) BENCH_ARGS+=("$arg") ;;
-        *)         CUSTOM_FILES+=("$arg") ;;
+        --markdown)   MARKDOWN=true ;;
+        --cold)       COLD=true ;;
+        --fluid-only) FLUID_ONLY=true ;;
+        -*)           echo "unknown flag: $arg"; exit 1 ;;
+        *)            CUSTOM_FILES+=("$arg") ;;
     esac
 done
 
@@ -32,19 +39,17 @@ done
 mkdir -p "$AUDIO_DIR"
 
 generate() {
-    local name="$1" rate="$2" text="$3"
+    local name="$1" text="$2"
     local path="$AUDIO_DIR/$name.aiff"
-    if [ ! -f "$path" ]; then
-        echo "  generating $name.aiff…"
-        say -r "$rate" -o "$path" "$text"
-    fi
+    [ -f "$path" ] && return
+    echo "  generating $name.aiff…"
+    say -r 180 -o "$path" "$text"
 }
 
 SHORT_TEXT="Pack my box with five dozen liquor jugs. \
 The quick brown fox jumps over the lazy dog. \
 How vexingly quick daft zebras jump."
 
-# ~90 words  ≈ 30 s at 180 wpm
 MEDIUM_TEXT="Automatic speech recognition has improved dramatically in recent years, \
 driven by deep learning and large-scale training data. \
 Modern systems can transcribe natural conversational speech with high accuracy, \
@@ -55,7 +60,6 @@ without sending audio to external servers. \
 This gives users both low latency and strong privacy guarantees, \
 which are especially important for professional and sensitive workflows."
 
-# ~370 words  ≈ 2 min at 180 wpm
 LONG_TEXT="The history of automatic speech recognition spans more than seven decades. \
 Early systems in the nineteen fifties could recognise only isolated digits spoken by a single speaker. \
 By the nineteen eighties, hidden Markov models had become the dominant approach, \
@@ -74,55 +78,140 @@ The Neural Engine can execute trillions of operations per second while consuming
 of the power required by GPU-based inference. \
 Parakeet, developed by NVIDIA and adapted for CoreML by FluidInference, \
 takes advantage of this hardware to deliver transcription that runs many times faster than real time \
-on MacBook Air and MacBook Pro. \
-For a menu bar dictation app, this matters enormously. \
-A model that finishes transcribing a thirty-second recording in under two seconds \
-feels instantaneous to the user, while one that takes ten seconds creates noticeable friction. \
-Beyond raw speed, on-device processing means audio never leaves the machine, \
-which is critical for users who dictate passwords, medical notes, legal documents, or personal messages. \
-The combination of accuracy, speed, and privacy makes neural-engine-accelerated speech recognition \
-one of the most compelling demonstrations of Apple Silicon's capabilities \
-for real-world productivity software."
+on MacBook Air and MacBook Pro."
 
 if [ ${#CUSTOM_FILES[@]} -eq 0 ]; then
-    echo "── Generating test clips ─────────────────────────────────────────────────"
-    generate "short"  180 "$SHORT_TEXT"
-    generate "medium" 180 "$MEDIUM_TEXT"
-    generate "long"   180 "$LONG_TEXT"
+    echo "── Generating test clips ──────────────────────────────────────────────────"
+    generate "short"  "$SHORT_TEXT"
+    generate "medium" "$MEDIUM_TEXT"
+    generate "long"   "$LONG_TEXT"
     echo ""
-    CLIP_ARGS=("$AUDIO_DIR/short.aiff" "$AUDIO_DIR/medium.aiff" "$AUDIO_DIR/long.aiff")
+    CLIPS=("$AUDIO_DIR/short.aiff" "$AUDIO_DIR/medium.aiff" "$AUDIO_DIR/long.aiff")
 else
-    CLIP_ARGS=("${CUSTOM_FILES[@]}")
+    CLIPS=("${CUSTOM_FILES[@]}")
 fi
 
-# ── Cold start: wipe cached models ────────────────────────────────────────────
+CLIP_NAMES=()
+for c in "${CLIPS[@]}"; do CLIP_NAMES+=("$(basename "$c")"); done
+
+# ── Cold start ─────────────────────────────────────────────────────────────────
 
 if [ "$COLD" = true ]; then
-    VERSION="v3"
-    for arg in "${BENCH_ARGS[@]}"; do
-        [[ "$arg" == "--v2" ]] && VERSION="v2"
-    done
-
-    CACHE_DIR="$HOME/Library/Caches/FluidAudio"
-    if [ -d "$CACHE_DIR" ]; then
-        echo "── Cold start: removing $CACHE_DIR ──────────────────────────────────────"
-        rm -rf "$CACHE_DIR"
-        echo "  Models deleted. They will be re-downloaded on first run."
-        echo ""
-    else
-        echo "  (no cache found at $CACHE_DIR — already cold)"
-        echo ""
-    fi
+    CACHE="$HOME/Library/Caches/FluidAudio"
+    [ -d "$CACHE" ] && { echo "── Wiping model cache ─────────────────────────────────────────────────────"; rm -rf "$CACHE"; echo ""; }
 fi
 
-# ── Build ──────────────────────────────────────────────────────────────────────
+# ── Python sidecar benchmarks ──────────────────────────────────────────────────
+# TSV output:  model \t clip \t duration \t infer \t rtfx
 
-echo "── Building benchmark ────────────────────────────────────────────────────"
+PYTHON_TSV=""
+
+if [ "$FLUID_ONLY" = false ] && [ -d "$SIDECAR_DIR" ]; then
+    echo "── Python sidecar benchmarks ─────────────────────────────────────────────"
+
+    PYCODE=$(cat << 'PYEOF'
+import sys, time, os, subprocess
+
+def duration(path):
+    r = subprocess.run(["afinfo", path], capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        if "estimated duration" in line.lower():
+            return float(line.split()[-2])
+    return 0.0
+
+mode = sys.argv[1]
+clips = sys.argv[2:]
+
+if mode == "whisper":
+    import whisper
+    m = whisper.load_model("tiny")
+    label = "Whisper tiny (sidecar)"
+    m.transcribe(clips[0])   # warmup
+    def infer(p): t=time.perf_counter(); m.transcribe(p); return time.perf_counter()-t
+else:
+    from parakeet_mlx import from_pretrained
+    m = from_pretrained("mlx-community/parakeet-tdt-0.6b-v3")
+    label = "Parakeet MLX (sidecar)"
+    m.transcribe(clips[0])   # warmup
+    def infer(p): t=time.perf_counter(); m.transcribe(p); return time.perf_counter()-t
+
+for p in clips:
+    d = duration(p); elapsed = infer(p); rtfx = d/elapsed if elapsed else 0
+    print(f"{label}\t{os.path.basename(p)}\t{d:.1f}\t{elapsed:.2f}\t{rtfx:.1f}", flush=True)
+PYEOF
+)
+
+    cd "$SIDECAR_DIR"
+    WHISPER_TSV=$(uv run python - "whisper" "${CLIPS[@]}" 2>/dev/null <<< "$PYCODE")
+    echo "  Whisper tiny  — done"
+    PARA_TSV=$(uv run python - "parakeet" "${CLIPS[@]}" 2>/dev/null <<< "$PYCODE")
+    echo "  Parakeet MLX  — done"
+    cd "$REPO_DIR"
+    PYTHON_TSV="${WHISPER_TSV}"$'\n'"${PARA_TSV}"
+    echo ""
+fi
+
+# ── FluidAudio benchmarks ──────────────────────────────────────────────────────
+
+echo "── FluidAudio benchmarks ─────────────────────────────────────────────────"
 cd "$BENCH_DIR"
-swift build -c release 2>&1 | grep -v "^Build complete\|^warning:"
+swift build -c release 2>&1 | grep -v "^Build complete\|^warning:\|^note:"
+
+V2_TSV=$(./.build/release/bench --v2 --tsv "${CLIPS[@]}" 2>/dev/null | sed 's/.*\(Parakeet\)/\1/' | grep '^Parakeet')
+echo "  Parakeet v2   — done"
+V3_TSV=$(./.build/release/bench --v3 --tsv "${CLIPS[@]}" 2>/dev/null | sed 's/.*\(Parakeet\)/\1/' | grep '^Parakeet')
+echo "  Parakeet v3   — done"
 echo ""
 
-# ── Run ───────────────────────────────────────────────────────────────────────
+# ── Render table via Python (bash 3 has no associative arrays) ────────────────
 
-echo "── Results ───────────────────────────────────────────────────────────────"
-"$BENCH_DIR/.build/release/bench" "${BENCH_ARGS[@]}" "${CLIP_ARGS[@]}"
+ALL_TSV=""
+[ -n "$PYTHON_TSV" ] && ALL_TSV="${PYTHON_TSV}"$'\n'
+ALL_TSV="${ALL_TSV}${V2_TSV}"$'\n'"${V3_TSV}"
+
+python3 - "$MARKDOWN" <<PYEOF
+import sys
+
+markdown = sys.argv[1] == "true"
+tsv = """$ALL_TSV"""
+
+rows = [line.split('\t') for line in tsv.strip().splitlines() if line.strip()]
+# rows: [model, clip, dur, infer, rtfx]
+
+models, clips = [], []
+data = {}
+for model, clip, dur, infer, rtfx in rows:
+    if model not in models: models.append(model)
+    if clip  not in clips:  clips.append(clip)
+    data[(model, clip)] = (rtfx, infer)
+
+if markdown:
+    print("### uttr — transcription speed benchmark")
+    print()
+    print("> RTFx = audio seconds ÷ inference seconds. Higher is faster.  ")
+    print("> Python sidecar models are the pre-M1 baseline. Warm models (cached).")
+    print()
+    header = "| Model | " + " | ".join(clips) + " |"
+    sep    = "|-------|" + "--------|" * len(clips)
+    print(header)
+    print(sep)
+    for model in models:
+        cells = []
+        for clip in clips:
+            rtfx, infer = data.get((model, clip), ("—", "—"))
+            cells.append(f"{rtfx}× / {infer}s")
+        print(f"| \`{model}\` | " + " | ".join(cells) + " |")
+    print()
+    print("![benchmark](bench/benchmark.png)")
+else:
+    col = 15
+    fmt = f"  {{:<32}}" + f"  {{:>{col}}}" * len(clips)
+    print(fmt.format("Model", *clips))
+    print(fmt.format("─"*32, *["─"*col]*len(clips)))
+    for model in models:
+        cells = []
+        for clip in clips:
+            rtfx, infer = data.get((model, clip), ("—", "—"))
+            cells.append(f"{rtfx}× / {infer}s")
+        print(fmt.format(model, *cells))
+PYEOF
