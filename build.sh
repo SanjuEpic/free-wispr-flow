@@ -133,29 +133,32 @@ BUILD_DIR=$(xcodebuild -project uttr.xcodeproj \
     -showBuildSettings 2>/dev/null | grep -m1 "BUILT_PRODUCTS_DIR" | awk '{print $3}')
 
 APP_PATH="$BUILD_DIR/uttr.app"
-FINAL_APP_PATH="/Applications/uttr.app"
 
 echo ""
 echo -e "${GREEN}=== Build Successful ===${NC}"
 echo -e "Built app: ${YELLOW}$APP_PATH${NC}"
 
-# Copy to Applications folder
-echo -e "${YELLOW}Installing to Applications folder...${NC}"
-if [ -d "$FINAL_APP_PATH" ]; then
-    echo -e "${YELLOW}Removing existing installation...${NC}"
-    rm -rf "$FINAL_APP_PATH"
-fi
-cp -R "$APP_PATH" "$FINAL_APP_PATH"
-echo -e "${GREEN}Installed: ${YELLOW}$FINAL_APP_PATH${NC}"
-
-# Open if requested
-if [ "$OPEN_APP" = true ]; then
+if [ "$CONFIGURATION" = "Release" ]; then
+    FINAL_APP_PATH="/Applications/uttr.app"
+    echo -e "${YELLOW}Installing to Applications folder...${NC}"
     if [ -d "$FINAL_APP_PATH" ]; then
+        echo -e "${YELLOW}Removing existing installation...${NC}"
+        rm -rf "$FINAL_APP_PATH"
+    fi
+    cp -R "$APP_PATH" "$FINAL_APP_PATH"
+    echo -e "${GREEN}Installed: ${YELLOW}$FINAL_APP_PATH${NC}"
+
+    if [ "$OPEN_APP" = true ]; then
         echo -e "${YELLOW}Opening app...${NC}"
         open "$FINAL_APP_PATH"
-    else
-        echo -e "${RED}App not found at expected location${NC}"
-        exit 1
+    fi
+else
+    # Debug builds run in-place — separate bundle ID avoids permission conflicts with /Applications/uttr.app
+    echo -e "${YELLOW}Debug build — skipping Applications install (bundle ID: io.github.Rakk301.uttr.debug)${NC}"
+
+    if [ "$OPEN_APP" = true ]; then
+        echo -e "${YELLOW}Opening app from build directory...${NC}"
+        open "$APP_PATH"
     fi
 fi
 

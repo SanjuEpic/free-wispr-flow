@@ -4,12 +4,7 @@ struct SettingsTabView: View {
     @StateObject private var settingsManager = SettingsManager()
     @StateObject private var hotkeyRecorder = HotkeyRecorder()
     @State private var isDeveloperSettingsExpanded = false
-    
-    
-    // No local state needed - using SettingsManager properties directly
-    @State private var serverHost = "localhost"
-    @State private var serverPort = 3001
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -18,7 +13,7 @@ struct SettingsTabView: View {
                     Text("Settings")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                    
+
                     Text("Configure your speech-to-text experience.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -26,60 +21,26 @@ struct SettingsTabView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
                 .padding(.bottom, 20)
-                
+
                 // Basic Settings Section
                 VStack(alignment: .leading, spacing: 16) {
-                    // STT Provider Setting
+                    // Provider picker
                     SettingRow(
-                        label: "STT Provider",
+                        label: "Transcription Provider",
                         description: "Choose the speech-to-text engine"
                     ) {
-                        Picker("", selection: $settingsManager.sttProvider) {
-                            Text("Whisper").tag("whisper")
-                            Text("Parakeet (Apple Silicon)").tag("parakeet")
+                        Picker("", selection: $settingsManager.transcriptionProviderID) {
+                            Text("Parakeet v3 (multilingual)").tag("fluidaudio.parakeet.v3")
+                            Text("Parakeet v2 (English)").tag("fluidaudio.parakeet.v2")
+                            Text("Whisper (Python)").tag("python.whisper")
                         }
                         .pickerStyle(MenuPickerStyle())
-                        .frame(width: 180)
-                        .onChange(of: settingsManager.sttProvider) { newValue in
-                            settingsManager.updateSTTProvider(newValue)
+                        .frame(width: 220)
+                        .onChange(of: settingsManager.transcriptionProviderID) { newValue in
+                            settingsManager.updateTranscriptionProvider(newValue)
                         }
                     }
-                    
-                    // Model Setting - conditional based on provider
-                    if settingsManager.sttProvider == "whisper" {
-                        SettingRow(
-                            label: "Whisper Model",
-                            description: "Choose the whisper model size"
-                        ) {
-                            Picker("", selection: $settingsManager.whisperModel) {
-                                ForEach(settingsManager.availableWhisperModels, id: \.self) { model in
-                                    Text(model.capitalized).tag(model)
-                                }
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                            .frame(width: 120)
-                            .onChange(of: settingsManager.whisperModel) { newValue in
-                                settingsManager.updateWhisperModel(newValue)
-                            }
-                        }
-                    } else if settingsManager.sttProvider == "parakeet" {
-                        SettingRow(
-                            label: "Parakeet Model",
-                            description: "MLX-optimized model for Apple Silicon"
-                        ) {
-                            Picker("", selection: $settingsManager.parakeetModel) {
-                                ForEach(settingsManager.availableParakeetModels, id: \.self) { model in
-                                    Text(model.split(separator: "/").last.map(String.init) ?? model).tag(model)
-                                }
-                            }
-                            .pickerStyle(MenuPickerStyle())
-                            .frame(width: 180)
-                            .onChange(of: settingsManager.parakeetModel) { newValue in
-                                settingsManager.updateParakeetModel(newValue)
-                            }
-                        }
-                    }
-                    
+
                     // Global Hotkey Setting
                     SettingRow(
                         label: "Global Hotkey",
@@ -88,18 +49,14 @@ struct SettingsTabView: View {
                         HStack(spacing: 8) {
                             if hotkeyRecorder.isRecording {
                                 if hotkeyRecorder.isRecordingComplete {
-                                    // Show recorded keycaps with accept/reject buttons
                                     HStack(spacing: 8) {
                                         KeycapDisplay(hotkey: hotkeyRecorder.getRecordedKeysString())
-                                        
+
                                         HStack(spacing: 4) {
                                             Button(action: {
                                                 let (keyCode, modifiers) = hotkeyRecorder.getHotkeyConfiguration()
                                                 settingsManager.updateHotkey(keyCode: keyCode, modifiers: modifiers)
-                                                
-                                                // Notify HotkeyManager to refresh the hotkey configuration
                                                 NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
-                                                
                                                 hotkeyRecorder.resetToDefaults()
                                                 hotkeyRecorder.stopRecording()
                                             }) {
@@ -111,7 +68,7 @@ struct SettingsTabView: View {
                                                     .clipShape(Circle())
                                             }
                                             .buttonStyle(.borderless)
-                                            
+
                                             Button(action: {
                                                 hotkeyRecorder.resetToDefaults()
                                                 hotkeyRecorder.stopRecording()
@@ -127,7 +84,6 @@ struct SettingsTabView: View {
                                         }
                                     }
                                 } else {
-                                    // Show "press keys" message while recording
                                     Text("Press keys...")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
@@ -137,10 +93,8 @@ struct SettingsTabView: View {
                                         .cornerRadius(6)
                                 }
                             } else {
-                                // Show current hotkey
                                 KeycapDisplay(hotkey: settingsManager.getHotkeyDisplayString())
-                                
-                                // Edit button
+
                                 Button(action: {
                                     hotkeyRecorder.startRecording()
                                 }) {
@@ -159,10 +113,10 @@ struct SettingsTabView: View {
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 20)
-                
+
                 Divider()
                     .padding(.horizontal, 24)
-                
+
                 // Developer Settings Section
                 VStack(alignment: .leading, spacing: 0) {
                     Button(action: {
@@ -174,13 +128,13 @@ struct SettingsTabView: View {
                             Image(systemName: "wrench.fill")
                                 .font(.system(size: 16, weight: .medium))
                                 .foregroundColor(.secondary)
-                            
+
                             Text("Developer Settings")
                                 .font(.headline)
                                 .fontWeight(.semibold)
-                            
+
                             Spacer()
-                            
+
                             Image(systemName: isDeveloperSettingsExpanded ? "chevron.down" : "chevron.right")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
@@ -191,95 +145,80 @@ struct SettingsTabView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
-                    
+
                     if isDeveloperSettingsExpanded {
                         VStack(alignment: .leading, spacing: 20) {
-                            // Whisper Advanced Subsection - only show when Whisper is selected
-                            if settingsManager.sttProvider == "whisper" {
-                                DeveloperSubsection(
-                                    title: "Whisper Advanced",
-                                    icon: "waveform"
-                                ) {
+                            // Whisper sub-settings — only shown when Whisper provider is active
+                            if settingsManager.transcriptionProviderID == "python.whisper" {
+                                DeveloperSubsection(title: "Whisper Advanced", icon: "waveform") {
                                     VStack(spacing: 12) {
-                                        // Task Setting
-                                        SettingRow(
-                                            label: "Task",
-                                            description: "Transcription task type"
-                                        ) {
-                                            Picker("", selection: $settingsManager.whisperTask) {
-                                                ForEach(["transcribe", "translate"], id: \.self) { task in
-                                                    Text(task.capitalized).tag(task)
+                                        SettingRow(label: "Model", description: "Whisper model size") {
+                                            Picker("", selection: $settingsManager.pythonWhisper.model) {
+                                                ForEach(["tiny", "base", "small", "medium", "large"], id: \.self) { m in
+                                                    Text(m.capitalized).tag(m)
                                                 }
                                             }
                                             .pickerStyle(MenuPickerStyle())
-                                            .frame(width: 140)
-                                            .onChange(of: settingsManager.whisperTask) { _ in
+                                            .frame(width: 120)
+                                            .onChange(of: settingsManager.pythonWhisper.model) { _ in
                                                 settingsManager.updateWhisperSettings()
                                             }
                                         }
-                                        
-                                        // Language Setting
-                                        SettingRow(
-                                            label: "Language",
-                                            description: "Audio language (auto-detect if not set)"
-                                        ) {
-                                            Picker("", selection: $settingsManager.whisperLanguage) {
-                                                ForEach(["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"], id: \.self) { language in
-                                                    Text(languageDisplayName(language)).tag(language)
-                                                }
-                                            }
-                                            .pickerStyle(MenuPickerStyle())
-                                            .frame(width: 140)
-                                            .onChange(of: settingsManager.whisperLanguage) { _ in
-                                                settingsManager.updateWhisperSettings()
-                                            }
-                                        }
-                                        
-                                        // Temperature Setting
-                                        SettingRow(
-                                            label: "Temperature",
-                                            description: "Sampling temperature (0.0 to 1.0)"
-                                        ) {
-                                            HStack {
-                                                Slider(value: $settingsManager.whisperTemperature, in: 0...1, step: 0.1)
 
-                                                Text(String(format: "%.1f", settingsManager.whisperTemperature))
+                                        SettingRow(label: "Task", description: "Transcription task type") {
+                                            Picker("", selection: $settingsManager.pythonWhisper.task) {
+                                                ForEach(["transcribe", "translate"], id: \.self) { t in
+                                                    Text(t.capitalized).tag(t)
+                                                }
+                                            }
+                                            .pickerStyle(MenuPickerStyle())
+                                            .frame(width: 140)
+                                            .onChange(of: settingsManager.pythonWhisper.task) { _ in
+                                                settingsManager.updateWhisperSettings()
+                                            }
+                                        }
+
+                                        SettingRow(label: "Language", description: "Audio language (auto-detect if not set)") {
+                                            Picker("", selection: $settingsManager.pythonWhisper.language) {
+                                                ForEach(["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"], id: \.self) { lang in
+                                                    Text(languageDisplayName(lang)).tag(lang)
+                                                }
+                                            }
+                                            .pickerStyle(MenuPickerStyle())
+                                            .frame(width: 140)
+                                            .onChange(of: settingsManager.pythonWhisper.language) { _ in
+                                                settingsManager.updateWhisperSettings()
+                                            }
+                                        }
+
+                                        SettingRow(label: "Temperature", description: "Sampling temperature (0.0 to 1.0)") {
+                                            HStack {
+                                                Slider(value: $settingsManager.pythonWhisper.temperature, in: 0...1, step: 0.1)
+                                                Text(String(format: "%.1f", settingsManager.pythonWhisper.temperature))
                                                     .font(.system(.body, design: .monospaced))
                                                     .foregroundColor(.secondary)
                                                     .frame(width: 30)
                                             }
-                                            .onChange(of: settingsManager.whisperTemperature) { _ in
+                                            .onChange(of: settingsManager.pythonWhisper.temperature) { _ in
                                                 settingsManager.updateWhisperSettings()
                                             }
                                         }
                                     }
                                 }
-                            }
-                            
-                            // Server Subsection
-                            DeveloperSubsection(
-                                title: "Server",
-                                icon: "server.rack"
-                            ) {
-                                VStack(spacing: 12) {
-                                    // Host Setting
-                                    SettingRow(
-                                        label: "Host",
-                                        description: "Server host address"
-                                    ) {
-                                        TextField("localhost", text: $serverHost)
-                                            .textFieldStyle(.roundedBorder)
-                                            .frame(width: 200)
-                                    }
-                                    
-                                    // Port Setting
-                                    SettingRow(
-                                        label: "Port",
-                                        description: "Server port number"
-                                    ) {
-                                        TextField("3001", value: $serverPort, format: .number)
-                                            .textFieldStyle(.roundedBorder)
-                                            .frame(width: 100)
+
+                                DeveloperSubsection(title: "Server", icon: "server.rack") {
+                                    VStack(spacing: 12) {
+                                        SettingRow(label: "Host", description: "Server host address") {
+                                            TextField("localhost", text: $settingsManager.pythonWhisper.serverHost)
+                                                .textFieldStyle(.roundedBorder)
+                                                .frame(width: 200)
+                                        }
+
+                                        SettingRow(label: "Port", description: "Server port number") {
+                                            TextField("3001", value: $settingsManager.pythonWhisper.serverPort, format: .number)
+                                                .textFieldStyle(.roundedBorder)
+                                                .frame(width: 100)
+                                        }
                                     }
                                 }
                             }
@@ -299,8 +238,7 @@ struct SettingsTabView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.textBackgroundColor))
     }
-    
-    // Helper function for language display names
+
     private func languageDisplayName(_ code: String) -> String {
         switch code {
         case "auto": return "Auto-detect"
@@ -325,25 +263,25 @@ struct SettingRow<Content: View>: View {
     let label: String
     let description: String
     let content: Content
-    
+
     init(label: String, description: String, @ViewBuilder content: () -> Content) {
         self.label = label
         self.description = description
         self.content = content()
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(label)
                     .font(.body)
                     .fontWeight(.medium)
-                
+
                 Spacer()
-                
+
                 content
             }
-            
+
             Text(description)
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -357,28 +295,28 @@ struct DeveloperSubsection<Content: View>: View {
     let title: String
     let icon: String
     let content: Content
-    
+
     init(title: String, icon: String, @ViewBuilder content: () -> Content) {
         self.title = title
         self.icon = icon
         self.content = content()
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.secondary)
-                
+
                 Text(title)
                     .font(.headline)
                     .fontWeight(.semibold)
-                
+
                 Spacer()
             }
             .padding(.horizontal, 24)
-            
+
             content
         }
     }
@@ -388,7 +326,7 @@ struct DeveloperSubsection<Content: View>: View {
 
 struct KeycapDisplay: View {
     let hotkey: String
-    
+
     var body: some View {
         HStack(spacing: 12) {
             ForEach(parseHotkeyComponents(hotkey), id: \.self) { component in
@@ -396,11 +334,11 @@ struct KeycapDisplay: View {
             }
         }
     }
-    
+
     private func parseHotkeyComponents(_ hotkey: String) -> [String] {
         var components: [String] = []
         var currentComponent = ""
-        
+
         for char in hotkey {
             if char.isLetter || char.isNumber {
                 if !currentComponent.isEmpty {
@@ -412,18 +350,18 @@ struct KeycapDisplay: View {
                 currentComponent += String(char)
             }
         }
-        
+
         if !currentComponent.isEmpty {
             components.append(currentComponent)
         }
-        
+
         return components
     }
 }
 
 struct KeycapView: View {
     let symbol: String
-    
+
     var body: some View {
         Text(symbol)
             .font(.system(size: 16, weight: .semibold, design: .rounded))
@@ -433,7 +371,6 @@ struct KeycapView: View {
             .padding(.vertical, 8)
             .background(
                 ZStack {
-                    // Outer border/shadow layer
                     RoundedRectangle(cornerRadius: 8)
                         .fill(
                             LinearGradient(
@@ -446,8 +383,7 @@ struct KeycapView: View {
                             )
                         )
                         .padding(-2)
-                    
-                    // Main keycap gradient
+
                     RoundedRectangle(cornerRadius: 7)
                         .fill(
                             LinearGradient(
@@ -459,8 +395,7 @@ struct KeycapView: View {
                                 endPoint: .bottom
                             )
                         )
-                    
-                    // Top highlight for glossy effect
+
                     RoundedRectangle(cornerRadius: 7)
                         .fill(
                             LinearGradient(
@@ -482,5 +417,3 @@ struct KeycapView: View {
 #Preview {
     SettingsTabView()
 }
-
-
