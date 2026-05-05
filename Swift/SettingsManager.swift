@@ -120,6 +120,7 @@ class SettingsManager: ObservableObject {
 
     @Published var hotkeyKeyCode: Int = 37  // L key
     @Published var hotkeyModifiers: [String] = ["option"]
+    @Published var providerStatus: String = "Loading…"
 
     // MARK: - Derived accessors used by TranscriptionServer
 
