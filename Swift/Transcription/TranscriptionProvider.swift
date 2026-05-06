@@ -14,14 +14,10 @@ protocol TranscriptionProvider: AnyObject {
 }
 
 enum TranscriptionProviderFactory {
-    static func make(id: String, settings: SettingsManager) -> TranscriptionProvider {
+    static func make(id: String) -> TranscriptionProvider {
         switch id {
-        case "fluidaudio.parakeet.v3":
-            return FluidAudioProvider(version: .v3)
         case "fluidaudio.parakeet.v2":
             return FluidAudioProvider(version: .v2)
-        case "python.whisper":
-            return PythonWhisperProvider(settings: settings)
         default:
             return FluidAudioProvider(version: .v3)
         }

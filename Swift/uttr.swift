@@ -64,8 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         hotkeyManager = HotkeyManager(settingsManager: settingsManager)
         pasteManager = PasteManager()
         transcriptionProvider = TranscriptionProviderFactory.make(
-            id: settingsManager.transcriptionProviderID,
-            settings: settingsManager
+            id: settingsManager.transcriptionProviderID
         )
         logger?.log("TranscriptionProvider initialized: \(settingsManager.transcriptionProviderID)", level: .debug)
 
@@ -359,8 +358,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             guard let self else { return }
             await self.transcriptionProvider?.teardown()
             self.transcriptionProvider = TranscriptionProviderFactory.make(
-                id: settingsManager.transcriptionProviderID,
-                settings: settingsManager
+                id: settingsManager.transcriptionProviderID
             )
             self.startTranscriptionProvider()
         }
