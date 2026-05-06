@@ -34,6 +34,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     private var historyWindow: NSWindow?
     private var historyWindowController: NSWindowController?
 
+    // Settings window
+    private var settingsWindow: NSWindow?
+    private var settingsWindowController: NSWindowController?
+
     private var isRecording = false
 
     // MARK: - App Lifecycle
@@ -165,7 +169,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         let popoverView = MenuBarPopoverView(viewModel: popoverViewModel)
 
         popover = NSPopover()
-        popover?.contentSize = NSSize(width: 220, height: 148)
+        popover?.contentSize = NSSize(width: 220, height: 46)
         popover?.behavior = .transient
         popover?.animates = true
         popover?.contentViewController = NSHostingController(rootView: popoverView)
@@ -274,13 +278,32 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     // MARK: - Window Management
 
+    /// Public entry point used by the popover button and the SwiftUI Settings command.
+    func showSettings() {
+        openSettingsWindow()
+    }
+
     private func openSettingsWindow() {
         logger?.log("Opening settings window", level: .info)
         closePopover()
-        DispatchQueue.main.async {
-            NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            NSApp.activate(ignoringOtherApps: true)
+
+        if settingsWindow == nil {
+            let hostingController = NSHostingController(
+                rootView: SettingsWindowView(settings: settingsManager)
+            )
+            settingsWindow = NSWindow(contentViewController: hostingController)
+            settingsWindow?.title = "Settings"
+            settingsWindow?.styleMask = [.titled, .closable, .miniaturizable]
+            settingsWindow?.setContentSize(NSSize(width: 520, height: 480))
+            settingsWindow?.center()
+            settingsWindow?.delegate = self
+            settingsWindowController = NSWindowController(window: settingsWindow)
         }
+
+        NSApp.setActivationPolicy(.regular)
+        settingsWindowController?.showWindow(nil)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private func openHistoryWindow() {
@@ -314,9 +337,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     // MARK: - Window Delegate
     func windowWillClose(_ notification: Notification) {
-        if notification.object as? NSWindow == historyWindow {
+        switch notification.object as? NSWindow {
+        case historyWindow:
             historyWindow = nil
             historyWindowController = nil
+        case settingsWindow:
+            settingsWindow = nil
+            settingsWindowController = nil
+        default:
+            break
         }
     }
 
@@ -345,6 +374,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         historyWindow?.close()
         historyWindow = nil
         historyWindowController = nil
+        settingsWindow?.close()
+        settingsWindow = nil
+        settingsWindowController = nil
         NotificationCenter.default.removeObserver(self)
         logger?.log("App terminating")
     }

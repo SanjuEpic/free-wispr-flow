@@ -13,7 +13,6 @@ class PopoverViewModel: ObservableObject {
 
     func toggleRecording() {
         if isRecording { onStopRecording?() } else { onStartRecording?() }
-        isRecording.toggle()
     }
 }
 
@@ -24,101 +23,80 @@ struct MenuBarPopoverView: View {
     @Environment(\.colorScheme) var scheme
 
     var body: some View {
-        VStack(spacing: 0) {
-            PopoverRow(
+        HStack(spacing: 2) {
+            ToolButton(
                 icon: viewModel.isRecording ? "stop.fill" : "mic",
-                label: viewModel.isRecording ? "Stop recording" : "Start recording",
-                shortcut: viewModel.hotkeyDisplay,
+                tint: viewModel.isRecording ? recordingTint : Color.textPrimary(for: scheme),
+                tooltip: viewModel.isRecording
+                    ? "Stop recording  \(viewModel.hotkeyDisplay)"
+                    : "Start recording  \(viewModel.hotkeyDisplay)",
                 scheme: scheme,
                 action: viewModel.toggleRecording
             )
-
-            popoverSeparator
-
-            PopoverRow(
+            divider
+            ToolButton(
                 icon: "list.bullet.rectangle",
-                label: "History…",
-                shortcut: nil,
+                tint: Color.textPrimary(for: scheme),
+                tooltip: "History",
                 scheme: scheme,
-                dimmed: viewModel.isRecording,
                 action: { viewModel.onOpenHistory?() }
             )
-
-            PopoverRow(
+            ToolButton(
                 icon: "gearshape",
-                label: "Settings…",
-                shortcut: "⌘,",
+                tint: Color.textPrimary(for: scheme),
+                tooltip: "Settings  ⌘,",
                 scheme: scheme,
-                dimmed: viewModel.isRecording,
                 action: { viewModel.onOpenSettings?() }
             )
-
-            popoverSeparator
-
-            PopoverRow(
-                icon: nil,
-                label: "Quit uttr",
-                shortcut: "⌘Q",
+            divider
+            ToolButton(
+                icon: "power",
+                tint: Color.textPrimary(for: scheme),
+                tooltip: "Quit uttr  ⌘Q",
                 scheme: scheme,
                 action: { NSApplication.shared.terminate(nil) }
             )
         }
-        .padding(4)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
         .frame(width: 220)
     }
 
-    private var popoverSeparator: some View {
+    private var divider: some View {
         Rectangle()
-            .fill(Color(hex: 0x1F1D1A, opacity: 0.12))
-            .frame(height: 0.5)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .fill(Color.rowSeparator(for: scheme))
+            .frame(width: 1, height: 18)
+            .padding(.horizontal, 4)
+    }
+
+    private var recordingTint: Color {
+        scheme == .dark ? Color(hex: 0xE07060) : Color(hex: 0xB94A3D)
     }
 }
 
-// MARK: - Row
-
-private struct PopoverRow: View {
-    let icon: String?
-    let label: String
-    let shortcut: String?
+private struct ToolButton: View {
+    let icon: String
+    let tint: Color
+    let tooltip: String
     let scheme: ColorScheme
-    var dimmed: Bool = false
     let action: () -> Void
 
     @State private var isHovered = false
 
     var body: some View {
-        Button(action: { if !dimmed { action() } }) {
-            HStack(spacing: 8) {
-                if let icon = icon {
-                    Image(systemName: icon)
-                        .font(.system(size: 13))
-                        .frame(width: 13, height: 13)
-                        .foregroundColor(.textPrimary(for: scheme))
-                } else {
-                    Spacer().frame(width: 13)
-                }
-                Text(label)
-                    .font(.system(size: 13))
-                    .foregroundColor(.textPrimary(for: scheme))
-                Spacer()
-                if let shortcut = shortcut {
-                    Text(shortcut)
-                        .font(.system(size: 11))
-                        .foregroundColor(.textPrimary(for: scheme).opacity(0.55))
-                }
-            }
-            .padding(.vertical, 6)
-            .padding(.horizontal, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isHovered && !dimmed ? Color.accentColor.opacity(0.12) : Color.clear)
-            )
-            .contentShape(Rectangle())
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 36, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isHovered ? Color.textPrimary(for: scheme).opacity(0.08) : Color.clear)
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .opacity(dimmed ? 0.4 : 1.0)
+        .help(tooltip)
         .onHover { isHovered = $0 }
     }
 }
@@ -126,6 +104,4 @@ private struct PopoverRow: View {
 #Preview {
     let vm = PopoverViewModel()
     return MenuBarPopoverView(viewModel: vm)
-        .frame(width: 220)
-        .padding(8)
 }
