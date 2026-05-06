@@ -13,73 +13,18 @@ struct FluidAudioSettings: Codable {
     }
 }
 
-struct PythonWhisperSettings: Codable {
-    var model: String = "small"
-    var task: String = "transcribe"
-    var language: String = "auto"
-    var temperature: Float = 0.0
-    var serverHost: String = "localhost"
-    var serverPort: Int = 3001
-    var uvPath: String = "/opt/homebrew/bin/uv"
-
-    enum CodingKeys: String, CodingKey {
-        case model, task, language, temperature
-        case serverHost = "server_host"
-        case serverPort = "server_port"
-        case uvPath = "uv_path"
-    }
-}
-
 // MARK: - Serialization schema (written to disk)
 
 private struct SerializedAppConfig: Codable {
     var provider: String
     var fluidAudio: FluidAudioSettings
-    var pythonWhisper: PythonWhisperSettings
     var hotkey: HotkeyConfig
 
     enum CodingKeys: String, CodingKey {
         case provider
         case fluidAudio = "fluid_audio"
-        case pythonWhisper = "python_whisper"
         case hotkey
     }
-}
-
-// MARK: - Legacy schema (migration only)
-
-private struct LegacyHotkeyConfig: Codable {
-    var keyCode: Int
-    var modifiers: [String]
-
-    enum CodingKeys: String, CodingKey {
-        case keyCode = "key_code"
-        case modifiers
-    }
-}
-
-private struct LegacyWhisperConfig: Codable {
-    var model: String
-    var task: String
-    var language: String
-    var temperature: Float
-}
-
-private struct LegacyServerConfig: Codable {
-    var host: String
-    var port: Int
-    var uvPath: String?
-
-    enum CodingKeys: String, CodingKey {
-        case host, port
-        case uvPath = "uv_path"
-    }
-}
-
-private struct LegacyAppConfig: Codable {
-    var whisper: LegacyWhisperConfig
-    var hotkey: LegacyHotkeyConfig
-    var server: LegacyServerConfig?
 }
 
 // MARK: - Hotkey config (shared schema)
@@ -100,12 +45,6 @@ extension Notification.Name {
     static let transcriptionProviderChanged = Notification.Name("transcriptionProviderChanged")
     static let hotkeyChanged = Notification.Name("hotkeyChanged")
     static let hotkeySettingsChanged = Notification.Name("hotkeySettingsChanged")
-    // Legacy names kept so existing callers still compile during transition
-    static let whisperModelChanged = Notification.Name("whisperModelChanged")
-    static let whisperSettingsChanged = Notification.Name("whisperSettingsChanged")
-    static let serverSettingsChanged = Notification.Name("serverSettingsChanged")
-    static let whisperModelReloaded = Notification.Name("whisperModelReloaded")
-    static let sttProviderChanged = Notification.Name("sttProviderChanged")
 }
 
 // MARK: - Settings Manager
@@ -116,26 +55,10 @@ class SettingsManager: ObservableObject {
 
     @Published var transcriptionProviderID: String = "fluidaudio.parakeet.v3"
     @Published var fluidAudio: FluidAudioSettings = .init()
-    @Published var pythonWhisper: PythonWhisperSettings = .init()
 
     @Published var hotkeyKeyCode: Int = 37  // L key
     @Published var hotkeyModifiers: [String] = ["option"]
     @Published var providerStatus: String = "Loading…"
-
-    // MARK: - Derived accessors used by TranscriptionServer
-
-    var serverHost: String {
-        get { pythonWhisper.serverHost }
-        set { pythonWhisper.serverHost = newValue }
-    }
-    var serverPort: Int {
-        get { pythonWhisper.serverPort }
-        set { pythonWhisper.serverPort = newValue }
-    }
-    var uvPath: String {
-        get { pythonWhisper.uvPath }
-        set { pythonWhisper.uvPath = newValue }
-    }
 
     // MARK: - Properties
 
@@ -182,7 +105,6 @@ class SettingsManager: ObservableObject {
             let config = SerializedAppConfig(
                 provider: transcriptionProviderID,
                 fluidAudio: fluidAudio,
-                pythonWhisper: pythonWhisper,
                 hotkey: HotkeyConfig(keyCode: hotkeyKeyCode, modifiers: hotkeyModifiers)
             )
 
@@ -216,16 +138,7 @@ class SettingsManager: ObservableObject {
         saveSettings()
     }
 
-    func updateWhisperSettings() {
-        NotificationCenter.default.post(name: .transcriptionProviderChanged, object: self)
-        saveSettings()
-    }
-
     // MARK: - Utility
-
-    func getServerURL() -> String {
-        "http://\(pythonWhisper.serverHost):\(pythonWhisper.serverPort)"
-    }
 
     func getHotkeyDisplayString() -> String {
         var display = ""
@@ -241,44 +154,24 @@ class SettingsManager: ObservableObject {
 
     private func parseYAMLSettings(_ yamlString: String) throws {
         let decoder = YAMLDecoder()
-
-        // Try new schema first (recognised by presence of `provider:` key)
-        if let newConfig = try? decoder.decode(SerializedAppConfig.self, from: yamlString) {
-            transcriptionProviderID = newConfig.provider
-            fluidAudio = newConfig.fluidAudio
-            pythonWhisper = newConfig.pythonWhisper
-            hotkeyKeyCode = newConfig.hotkey.keyCode
-            hotkeyModifiers = newConfig.hotkey.modifiers
+        guard let config = try? decoder.decode(SerializedAppConfig.self, from: yamlString) else {
+            logger.log("Unrecognized settings format, applying defaults", level: .info)
+            setDefaultSettings()
             return
         }
-
-        // Legacy schema: migrate and write new shape
-        if let legacy = try? decoder.decode(LegacyAppConfig.self, from: yamlString) {
-            logger.log("Migrating legacy settings to new schema", level: .info)
+        transcriptionProviderID = config.provider
+        fluidAudio = config.fluidAudio
+        hotkeyKeyCode = config.hotkey.keyCode
+        hotkeyModifiers = config.hotkey.modifiers
+        if transcriptionProviderID == "python.whisper" {
             transcriptionProviderID = "fluidaudio.parakeet.v3"
-            fluidAudio = FluidAudioSettings()
-            pythonWhisper = PythonWhisperSettings(
-                model: legacy.whisper.model,
-                task: legacy.whisper.task,
-                language: legacy.whisper.language,
-                temperature: legacy.whisper.temperature,
-                serverHost: legacy.server?.host ?? "localhost",
-                serverPort: legacy.server?.port ?? 3001,
-                uvPath: legacy.server?.uvPath ?? "/opt/homebrew/bin/uv"
-            )
-            hotkeyKeyCode = legacy.hotkey.keyCode
-            hotkeyModifiers = legacy.hotkey.modifiers
             saveSettings()
-            return
         }
-
-        throw SettingsLoadError.unrecognizedFormat
     }
 
     private func setDefaultSettings() {
         transcriptionProviderID = "fluidaudio.parakeet.v3"
         fluidAudio = FluidAudioSettings()
-        pythonWhisper = PythonWhisperSettings()
         hotkeyKeyCode = 37
         hotkeyModifiers = ["option"]
         logger.log("Default settings applied", level: .info)
@@ -306,6 +199,3 @@ class SettingsManager: ObservableObject {
     }
 }
 
-enum SettingsLoadError: Error {
-    case unrecognizedFormat
-}

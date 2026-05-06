@@ -144,11 +144,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     }
 
     private func updateProviderStatus() {
-        if settingsManager.transcriptionProviderID == "python.whisper" {
-            settingsManager.providerStatus = "Sidecar running · port \(settingsManager.pythonWhisper.serverPort)"
-        } else {
-            settingsManager.providerStatus = "Loaded · ~600 MB"
-        }
+        settingsManager.providerStatus = "Loaded · ~600 MB"
     }
 
     private func setupMenuBar() {
