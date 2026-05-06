@@ -7,10 +7,10 @@ struct uttr: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // Menu bar app
         Settings {
-            EmptyView()
+            SettingsWindowView(settings: appDelegate.settingsManager)
         }
+        .defaultSize(width: 520, height: 480)
     }
 }
 
@@ -23,13 +23,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     private var pasteManager: PasteManager?
     private var transcriptionProvider: TranscriptionProvider?
     private var logger: Logger?
-    private var settingsManager: SettingsManager?
-    private var historyManager: HistoryManager?
+    let settingsManager = SettingsManager()
     private var notificationManager: NotificationManager?
-    private var menuBarPopoverView: MenuBarPopoverView?
+    private var popoverViewModel = PopoverViewModel()
     private var popover: NSPopover?
     private var menuBarIconManager: MenuBarIconManager?
     private var eventMonitor: Any?
+
+    // History window
+    private var historyWindow: NSWindow?
+    private var historyWindowController: NSWindowController?
 
     // Settings window
     private var settingsWindow: NSWindow?
@@ -39,9 +42,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     // MARK: - App Lifecycle
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Configure as menu bar app - hide from dock and cmd+tab
         NSApp.setActivationPolicy(.accessory)
-
         setupComponents()
         setupMenuBar()
         startTranscriptionProvider()
@@ -57,18 +58,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         logger = Logger()
         logger?.log("=== Initializing App Setup ===", level: .debug)
 
-        // Initialize managers
-        settingsManager = SettingsManager()
-        historyManager = HistoryManager()
         notificationManager = NotificationManager()
-
-        // Initialize core components
         audioRecorder = AudioRecorder()
-
-        guard let settingsManager = settingsManager else {
-            logger?.log("Failed to initialize required managers", level: .error)
-            return
-        }
 
         hotkeyManager = HotkeyManager(settingsManager: settingsManager)
         pasteManager = PasteManager()
@@ -78,31 +69,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         )
         logger?.log("TranscriptionProvider initialized: \(settingsManager.transcriptionProviderID)", level: .debug)
 
-        // Set up hotkey callbacks
         hotkeyManager?.onTranscribeHotkeyPressed = { [weak self] in
             self?.handleTranscribeHotkeyPress()
         }
 
-        // Initialize menu bar popover view
-        menuBarPopoverView = MenuBarPopoverView()
-        menuBarPopoverView?.onStartRecording = { [weak self] in
-            self?.startRecording()
-        }
-        menuBarPopoverView?.onStopRecording = { [weak self] in
-            self?.stopRecording()
-        }
-        menuBarPopoverView?.onOpenSettings = { [weak self] in
-            self?.openSettingsWindow()
-        }
+        // Wire popover callbacks
+        popoverViewModel.hotkeyDisplay = settingsManager.getHotkeyDisplayString()
+        popoverViewModel.onStartRecording = { [weak self] in self?.startRecording() }
+        popoverViewModel.onStopRecording  = { [weak self] in self?.stopRecording() }
+        popoverViewModel.onOpenSettings   = { [weak self] in self?.openSettingsWindow() }
+        popoverViewModel.onOpenHistory    = { [weak self] in self?.openHistoryWindow() }
 
-        // Set up notification observers for settings changes
         NotificationCenter.default.addObserver(
             forName: .transcriptionProviderChanged,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
-            self?.handleSettingsChanged()
-        }
+        ) { [weak self] _ in self?.handleSettingsChanged() }
 
         NotificationCenter.default.addObserver(
             forName: .hotkeyChanged,
@@ -110,28 +92,63 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             queue: .main
         ) { [weak self] _ in
             self?.hotkeyManager?.refreshHotkeyConfiguration()
+            self?.popoverViewModel.hotkeyDisplay = self?.settingsManager.getHotkeyDisplayString() ?? ""
+        }
+
+        // Show dock icon whenever a titled window is active
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let window = notification.object as? NSWindow,
+               window.styleMask.contains(.titled) {
+                NSApp.setActivationPolicy(.regular)
+            }
+        }
+
+        // Reset activation policy to accessory when all titled windows have closed
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self?.dismissIfNoWindows()
+            }
         }
 
         logger?.log("App Components Initialized", level: .debug)
     }
 
     private func startTranscriptionProvider() {
+        settingsManager.providerStatus = "Loading…"
         Task { [weak self] in
             guard let self, let provider = self.transcriptionProvider else { return }
             do {
                 try await provider.prepare()
                 await MainActor.run {
                     self.logger?.log("Transcription provider ready: \(provider.displayName)", level: .info)
+                    self.updateProviderStatus()
                     self.notificationManager?.showAppInitializationSuccess()
                     self.menuBarIconManager?.playStartupAnimation()
                 }
             } catch {
                 await MainActor.run {
                     self.logger?.log("Failed to prepare transcription provider: \(error)", level: .error)
+                    self.settingsManager.providerStatus = "Failed — \(error.localizedDescription)"
                     self.notificationManager?.showAppInitializationError("Failed to prepare transcription provider")
                     self.menuBarIconManager?.showErrorState()
                 }
             }
+        }
+    }
+
+    private func updateProviderStatus() {
+        if settingsManager.transcriptionProviderID == "python.whisper" {
+            settingsManager.providerStatus = "Sidecar running · port \(settingsManager.pythonWhisper.serverPort)"
+        } else {
+            settingsManager.providerStatus = "Loaded · ~600 MB"
         }
     }
 
@@ -144,26 +161,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             button.target = self
         }
 
-        // Initialize the menu bar icon manager
         menuBarIconManager = MenuBarIconManager(statusItem: statusItem!)
-
-        // Setup popover for menu with our custom MenuBarView
         setupPopover()
     }
 
     private func setupPopover() {
-        guard let menuBarPopoverView = menuBarPopoverView else {
-            logger?.log("Error: menuBarPopoverView is nil during popover setup", level: .error)
-            return
-        }
+        let popoverView = MenuBarPopoverView(viewModel: popoverViewModel)
 
         popover = NSPopover()
-        popover?.contentSize = NSSize(width: 160, height: 54)
-        popover?.behavior = .transient  // Auto-dismisses when losing focus
+        popover?.contentSize = NSSize(width: 220, height: 46)
+        popover?.behavior = .transient
         popover?.animates = true
-        popover?.contentViewController = NSHostingController(rootView: menuBarPopoverView)
-
-        // Set up popover delegate for additional menu-bar behavior
+        popover?.contentViewController = NSHostingController(rootView: popoverView)
         popover?.delegate = self
 
         logger?.log("MenuBarPopoverView setup complete", level: .debug)
@@ -171,34 +180,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     // MARK: - Event Handlers
     @objc private func menuBarClicked() {
-        logger?.log("Menu bar clicked!")
-
         guard let button = statusItem?.button else { return }
-
-        if popover?.isShown == true {
-            closePopover()
-        } else {
-            showPopover()
-        }
+        if popover?.isShown == true { closePopover() } else { showPopover() }
     }
 
     private func showPopover() {
         guard let button = statusItem?.button else { return }
-
         popover?.show(relativeTo: button.bounds, of: button, preferredEdge: NSRectEdge.minY)
-
-        // Add event monitor to detect clicks outside the popover
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            if self?.popover?.isShown == true {
-                self?.closePopover()
-            }
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            if self?.popover?.isShown == true { self?.closePopover() }
         }
     }
 
     private func closePopover() {
         popover?.performClose(nil)
-
-        // Remove event monitor
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
             eventMonitor = nil
@@ -206,26 +201,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
     }
 
     private func handleTranscribeHotkeyPress() {
-        if isRecording {
-            logger?.log("Stopping recording...", level: .info)
-            stopRecording()
-        } else {
-            logger?.log("Starting recording...", level: .info)
-            startRecording()
-        }
+        if isRecording { stopRecording() } else { startRecording() }
     }
 
     private func startRecording() {
         guard !isRecording else { return }
-
         do {
             try audioRecorder?.startRecording()
             isRecording = true
-            menuBarPopoverView?.updateRecordingState(true)
-
-            // Hide our icon and let Apple's native recording indicator show
+            popoverViewModel.isRecording = true
             menuBarIconManager?.setRecordingState()
-
             notificationManager?.showRecordingStarted()
             logger?.log("Recording started")
         } catch {
@@ -246,17 +231,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         }
 
         isRecording = false
-        menuBarPopoverView?.updateRecordingState(false)
+        popoverViewModel.isRecording = false
         notificationManager?.showRecordingStopped()
         logger?.log("Audio file successfully saved to: \(audioFileURL.path)", level: .debug)
         menuBarIconManager?.setProcessingState()
-
         processAudioFile(audioFileURL)
     }
 
     private func processAudioFile(_ audioFileURL: URL) {
         logger?.log("Starting audio file processing for: \(audioFileURL.path)", level: .info)
-
         Task { [weak self] in
             guard let self, let provider = self.transcriptionProvider else { return }
             do {
@@ -268,7 +251,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
             } catch {
                 await MainActor.run {
                     self.logger?.logError(error, context: "Transcription failed")
-                    self.logger?.log("Transcription failed: \(error.localizedDescription)", level: .error)
                     self.notificationManager?.showTranscriptionError("Transcription failed: \(error.localizedDescription)")
                     self.menuBarIconManager?.showErrorState()
                 }
@@ -278,11 +260,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     private func handleTranscribedText(_ text: String, audioFileName: String? = nil) {
         logger?.log("Handling transcribed text: \(text)", level: .info)
-
-        // Add to history
-        historyManager?.addTranscription(text, audioFileName: audioFileName)
-
-        // Paste the transcribed text at cursor
+        HistoryManager.shared.addTranscription(text, audioFileName: audioFileName)
         pasteManager?.pasteText(text) { [weak self] success in
             DispatchQueue.main.async {
                 if success {
@@ -298,48 +276,76 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         }
     }
 
-    // MARK: - Settings Window Management
+    // MARK: - Window Management
+
+    /// Public entry point used by the popover button and the SwiftUI Settings command.
+    func showSettings() {
+        openSettingsWindow()
+    }
+
     private func openSettingsWindow() {
         logger?.log("Opening settings window", level: .info)
+        closePopover()
 
         if settingsWindow == nil {
-            // Create settings window
-            let settingsView = SettingsWindowView()
-            let hostingController = NSHostingController(rootView: settingsView)
-
+            let hostingController = NSHostingController(
+                rootView: SettingsWindowView(settings: settingsManager)
+            )
             settingsWindow = NSWindow(contentViewController: hostingController)
-            settingsWindow?.title = "uttr"
-            settingsWindow?.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-            settingsWindow?.setContentSize(NSSize(width: 700, height: 500))
+            settingsWindow?.title = "Settings"
+            settingsWindow?.styleMask = [.titled, .closable, .miniaturizable]
+            settingsWindow?.setContentSize(NSSize(width: 520, height: 480))
             settingsWindow?.center()
             settingsWindow?.delegate = self
-
             settingsWindowController = NSWindowController(window: settingsWindow)
         }
 
-        // Show in dock and cmd+tab
         NSApp.setActivationPolicy(.regular)
-
-        // Show and activate window
         settingsWindowController?.showWindow(nil)
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func closeSettingsWindow() {
-        logger?.log("Closing settings window", level: .info)
+    private func openHistoryWindow() {
+        logger?.log("Opening history window", level: .info)
 
-        settingsWindow = nil
-        settingsWindowController = nil
+        if historyWindow == nil {
+            let hostingController = NSHostingController(rootView: HomeTabView())
+            historyWindow = NSWindow(contentViewController: hostingController)
+            historyWindow?.title = "History"
+            historyWindow?.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            historyWindow?.setContentSize(NSSize(width: 520, height: 500))
+            historyWindow?.center()
+            historyWindow?.delegate = self
+            historyWindowController = NSWindowController(window: historyWindow)
+        }
 
-        // Hide from dock and cmd+tab
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
+        historyWindowController?.showWindow(nil)
+        historyWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func dismissIfNoWindows() {
+        let hasVisibleTitledWindow = NSApp.windows.contains {
+            $0.isVisible && $0.styleMask.contains(.titled)
+        }
+        if !hasVisibleTitledWindow {
+            NSApp.setActivationPolicy(.accessory)
+        }
     }
 
     // MARK: - Window Delegate
     func windowWillClose(_ notification: Notification) {
-        if notification.object as? NSWindow == settingsWindow {
-            closeSettingsWindow()
+        switch notification.object as? NSWindow {
+        case historyWindow:
+            historyWindow = nil
+            historyWindowController = nil
+        case settingsWindow:
+            settingsWindow = nil
+            settingsWindowController = nil
+        default:
+            break
         }
     }
 
@@ -348,13 +354,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
         logger?.log("Settings changed, swapping transcription provider", level: .info)
         hotkeyManager?.refreshHotkeyConfiguration()
 
-        guard let settings = settingsManager else { return }
+        settingsManager.providerStatus = "Loading…"
         Task { [weak self] in
             guard let self else { return }
             await self.transcriptionProvider?.teardown()
             self.transcriptionProvider = TranscriptionProviderFactory.make(
-                id: settings.transcriptionProviderID,
-                settings: settings
+                id: settingsManager.transcriptionProviderID,
+                settings: settingsManager
             )
             self.startTranscriptionProvider()
         }
@@ -362,19 +368,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowD
 
     // MARK: - Cleanup
     private func cleanup() {
-        if isRecording {
-            _ = audioRecorder?.stopRecording()
-        }
+        if isRecording { _ = audioRecorder?.stopRecording() }
         Task { await transcriptionProvider?.teardown() }
         closePopover()
-
-        // Close settings window if open
-        if settingsWindow != nil {
-            settingsWindow?.close()
-            settingsWindow = nil
-            settingsWindowController = nil
-        }
-
+        historyWindow?.close()
+        historyWindow = nil
+        historyWindowController = nil
+        settingsWindow?.close()
+        settingsWindow = nil
+        settingsWindowController = nil
         NotificationCenter.default.removeObserver(self)
         logger?.log("App terminating")
     }

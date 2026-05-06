@@ -1,107 +1,107 @@
 import SwiftUI
 
-struct MenuBarPopoverView: View {
-    @State private var isRecording = false
-    
+// MARK: - View model (owned by AppDelegate, observed by the view)
+
+class PopoverViewModel: ObservableObject {
+    @Published var isRecording = false
+    @Published var hotkeyDisplay: String = "⌥L"
+
     var onStartRecording: (() -> Void)?
     var onStopRecording: (() -> Void)?
     var onOpenSettings: (() -> Void)?
-    
-    var body: some View {
-        HStack(spacing: 0) {
-            // Start/Stop Recording Button
-            IconButton(
-                icon: isRecording ? "stop.circle.fill" : "mic.circle.fill",
-                color: isRecording ? .red : .blue,
-                action: handleRecordingToggle
-            )
-            .frame(width: 38, height: 38)
-            
-            Divider()
-                .frame(width: 1, height: 28)
-                .padding(.horizontal, 6)
-            
-            // Settings Button
-            IconButton(
-                icon: "gearshape.fill",
-                color: .gray,
-                action: { onOpenSettings?() }
-            )
-            .frame(width: 38, height: 38)
-            
-            Divider()
-                .frame(width: 1, height: 28)
-                .padding(.horizontal, 6)
-            
-            // Quit Button
-            IconButton(
-                icon: "power",
-                color: .red,
-                action: { NSApplication.shared.terminate(nil) }
-            )
-            .frame(width: 38, height: 38)
-        }
-        .frame(height: 38)  // Exact content height
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(width: 160, height: 54)  // Exact total dimensions: 3×38 + 2×13 + 2×10 = 160
-        .background(Color(NSColor.windowBackgroundColor))
-    }
-    
-    private func handleRecordingToggle() {
-        if isRecording {
-            onStopRecording?()
-        } else {
-            onStartRecording?()
-        }
-        isRecording.toggle()
-    }
-    
-    func updateRecordingState(_ recording: Bool) {
-        isRecording = recording
+    var onOpenHistory: (() -> Void)?
+
+    func toggleRecording() {
+        if isRecording { onStopRecording?() } else { onStartRecording?() }
     }
 }
 
-// MARK: - Icon Button Component
-struct IconButton: View {
+// MARK: - View
+
+struct MenuBarPopoverView: View {
+    @ObservedObject var viewModel: PopoverViewModel
+    @Environment(\.colorScheme) var scheme
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ToolButton(
+                icon: viewModel.isRecording ? "stop.fill" : "mic",
+                tint: viewModel.isRecording ? recordingTint : Color.textPrimary(for: scheme),
+                tooltip: viewModel.isRecording
+                    ? "Stop recording  \(viewModel.hotkeyDisplay)"
+                    : "Start recording  \(viewModel.hotkeyDisplay)",
+                scheme: scheme,
+                action: viewModel.toggleRecording
+            )
+            divider
+            ToolButton(
+                icon: "list.bullet.rectangle",
+                tint: Color.textPrimary(for: scheme),
+                tooltip: "History",
+                scheme: scheme,
+                action: { viewModel.onOpenHistory?() }
+            )
+            ToolButton(
+                icon: "gearshape",
+                tint: Color.textPrimary(for: scheme),
+                tooltip: "Settings  ⌘,",
+                scheme: scheme,
+                action: { viewModel.onOpenSettings?() }
+            )
+            divider
+            ToolButton(
+                icon: "power",
+                tint: Color.textPrimary(for: scheme),
+                tooltip: "Quit uttr  ⌘Q",
+                scheme: scheme,
+                action: { NSApplication.shared.terminate(nil) }
+            )
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .frame(width: 220)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Color.rowSeparator(for: scheme))
+            .frame(width: 1, height: 18)
+            .padding(.horizontal, 4)
+    }
+
+    private var recordingTint: Color {
+        scheme == .dark ? Color(hex: 0xE07060) : Color(hex: 0xB94A3D)
+    }
+}
+
+private struct ToolButton: View {
     let icon: String
-    let color: Color
+    let tint: Color
+    let tooltip: String
+    let scheme: ColorScheme
     let action: () -> Void
-    
+
     @State private var isHovered = false
-    
+
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundColor(color)
-                .frame(width: 38, height: 38, alignment: .center)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 36, height: 30)
                 .background(
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(isHovered ? Color.gray.opacity(0.15) : Color.clear)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isHovered ? Color.textPrimary(for: scheme).opacity(0.08) : Color.clear)
                 )
+                .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
-        .frame(width: 38, height: 38)  // Enforce exact button size
-        .onHover { hovering in
-            isHovered = hovering
-        }
-        .help(getTooltip())
-    }
-    
-    private func getTooltip() -> String {
-        switch icon {
-        case "mic.circle.fill": return "Start Recording"
-        case "stop.circle.fill": return "Stop Recording"
-        case "gearshape.fill": return "Settings"
-        case "power": return "Quit"
-        default: return ""
-        }
+        .buttonStyle(.plain)
+        .help(tooltip)
+        .onHover { isHovered = $0 }
     }
 }
 
 #Preview {
-    MenuBarPopoverView()
+    let vm = PopoverViewModel()
+    return MenuBarPopoverView(viewModel: vm)
 }
-
-

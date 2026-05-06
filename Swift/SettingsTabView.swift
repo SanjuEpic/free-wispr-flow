@@ -1,419 +1,387 @@
 import SwiftUI
 
 struct SettingsTabView: View {
-    @StateObject private var settingsManager = SettingsManager()
+    @ObservedObject var settings: SettingsManager
     @StateObject private var hotkeyRecorder = HotkeyRecorder()
-    @State private var isDeveloperSettingsExpanded = false
+    @Environment(\.colorScheme) var scheme
 
     var body: some View {
-        ScrollView {
+        ZStack(alignment: .top) {
+            Color.windowBackground(for: scheme).ignoresSafeArea()
             VStack(alignment: .leading, spacing: 0) {
-                // Header Section
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Settings")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-
-                    Text("Configure your speech-to-text experience.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 20)
-
-                // Basic Settings Section
-                VStack(alignment: .leading, spacing: 16) {
-                    // Provider picker
-                    SettingRow(
-                        label: "Transcription Provider",
-                        description: "Choose the speech-to-text engine"
-                    ) {
-                        Picker("", selection: $settingsManager.transcriptionProviderID) {
-                            Text("Parakeet v3 (multilingual)").tag("fluidaudio.parakeet.v3")
-                            Text("Parakeet v2 (English)").tag("fluidaudio.parakeet.v2")
-                            Text("Whisper (Python)").tag("python.whisper")
-                        }
-                        .pickerStyle(MenuPickerStyle())
-                        .frame(width: 220)
-                        .onChange(of: settingsManager.transcriptionProviderID) { newValue in
-                            settingsManager.updateTranscriptionProvider(newValue)
-                        }
-                    }
-
-                    // Global Hotkey Setting
-                    SettingRow(
-                        label: "Global Hotkey",
-                        description: "Keyboard shortcut to start/stop recording"
-                    ) {
-                        HStack(spacing: 8) {
-                            if hotkeyRecorder.isRecording {
-                                if hotkeyRecorder.isRecordingComplete {
-                                    HStack(spacing: 8) {
-                                        KeycapDisplay(hotkey: hotkeyRecorder.getRecordedKeysString())
-
-                                        HStack(spacing: 4) {
-                                            Button(action: {
-                                                let (keyCode, modifiers) = hotkeyRecorder.getHotkeyConfiguration()
-                                                settingsManager.updateHotkey(keyCode: keyCode, modifiers: modifiers)
-                                                NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
-                                                hotkeyRecorder.resetToDefaults()
-                                                hotkeyRecorder.stopRecording()
-                                            }) {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 12, weight: .semibold))
-                                                    .foregroundColor(.white)
-                                                    .frame(width: 20, height: 20)
-                                                    .background(Color.green)
-                                                    .clipShape(Circle())
-                                            }
-                                            .buttonStyle(.borderless)
-
-                                            Button(action: {
-                                                hotkeyRecorder.resetToDefaults()
-                                                hotkeyRecorder.stopRecording()
-                                            }) {
-                                                Image(systemName: "xmark")
-                                                    .font(.system(size: 12, weight: .semibold))
-                                                    .foregroundColor(.white)
-                                                    .frame(width: 20, height: 20)
-                                                    .background(Color.red)
-                                                    .clipShape(Circle())
-                                            }
-                                            .buttonStyle(.borderless)
-                                        }
-                                    }
-                                } else {
-                                    Text("Press keys...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Color.gray.opacity(0.1))
-                                        .cornerRadius(6)
-                                }
-                            } else {
-                                KeycapDisplay(hotkey: settingsManager.getHotkeyDisplayString())
-
-                                Button(action: {
-                                    hotkeyRecorder.startRecording()
-                                }) {
-                                    Image(systemName: "pencil")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.blue)
-                                }
-                                .buttonStyle(.borderless)
-                            }
-                        }
-                    }
-                }
-                .padding(20)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 20)
-
-                Divider()
-                    .padding(.horizontal, 24)
-
-                // Developer Settings Section
-                VStack(alignment: .leading, spacing: 0) {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isDeveloperSettingsExpanded.toggle()
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "wrench.fill")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.secondary)
-
-                            Text("Developer Settings")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-
-                            Spacer()
-
-                            Image(systemName: isDeveloperSettingsExpanded ? "chevron.down" : "chevron.right")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 20)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-
-                    if isDeveloperSettingsExpanded {
-                        VStack(alignment: .leading, spacing: 20) {
-                            // Whisper sub-settings — only shown when Whisper provider is active
-                            if settingsManager.transcriptionProviderID == "python.whisper" {
-                                DeveloperSubsection(title: "Whisper Advanced", icon: "waveform") {
-                                    VStack(spacing: 12) {
-                                        SettingRow(label: "Model", description: "Whisper model size") {
-                                            Picker("", selection: $settingsManager.pythonWhisper.model) {
-                                                ForEach(["tiny", "base", "small", "medium", "large"], id: \.self) { m in
-                                                    Text(m.capitalized).tag(m)
-                                                }
-                                            }
-                                            .pickerStyle(MenuPickerStyle())
-                                            .frame(width: 120)
-                                            .onChange(of: settingsManager.pythonWhisper.model) { _ in
-                                                settingsManager.updateWhisperSettings()
-                                            }
-                                        }
-
-                                        SettingRow(label: "Task", description: "Transcription task type") {
-                                            Picker("", selection: $settingsManager.pythonWhisper.task) {
-                                                ForEach(["transcribe", "translate"], id: \.self) { t in
-                                                    Text(t.capitalized).tag(t)
-                                                }
-                                            }
-                                            .pickerStyle(MenuPickerStyle())
-                                            .frame(width: 140)
-                                            .onChange(of: settingsManager.pythonWhisper.task) { _ in
-                                                settingsManager.updateWhisperSettings()
-                                            }
-                                        }
-
-                                        SettingRow(label: "Language", description: "Audio language (auto-detect if not set)") {
-                                            Picker("", selection: $settingsManager.pythonWhisper.language) {
-                                                ForEach(["auto", "en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh"], id: \.self) { lang in
-                                                    Text(languageDisplayName(lang)).tag(lang)
-                                                }
-                                            }
-                                            .pickerStyle(MenuPickerStyle())
-                                            .frame(width: 140)
-                                            .onChange(of: settingsManager.pythonWhisper.language) { _ in
-                                                settingsManager.updateWhisperSettings()
-                                            }
-                                        }
-
-                                        SettingRow(label: "Temperature", description: "Sampling temperature (0.0 to 1.0)") {
-                                            HStack {
-                                                Slider(value: $settingsManager.pythonWhisper.temperature, in: 0...1, step: 0.1)
-                                                Text(String(format: "%.1f", settingsManager.pythonWhisper.temperature))
-                                                    .font(.system(.body, design: .monospaced))
-                                                    .foregroundColor(.secondary)
-                                                    .frame(width: 30)
-                                            }
-                                            .onChange(of: settingsManager.pythonWhisper.temperature) { _ in
-                                                settingsManager.updateWhisperSettings()
-                                            }
-                                        }
-                                    }
-                                }
-
-                                DeveloperSubsection(title: "Server", icon: "server.rack") {
-                                    VStack(spacing: 12) {
-                                        SettingRow(label: "Host", description: "Server host address") {
-                                            TextField("localhost", text: $settingsManager.pythonWhisper.serverHost)
-                                                .textFieldStyle(.roundedBorder)
-                                                .frame(width: 200)
-                                        }
-
-                                        SettingRow(label: "Port", description: "Server port number") {
-                                            TextField("3001", value: $settingsManager.pythonWhisper.serverPort, format: .number)
-                                                .textFieldStyle(.roundedBorder)
-                                                .frame(width: 100)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 20)
-                    }
-                }
-                .padding(20)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(12)
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                transcriptionSection
+                Spacer().frame(height: 28)
+                hotkeySection
+                Spacer().frame(height: 28)
+                aboutSection
+                Spacer()
             }
+            .padding(.top, 24)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 28)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.textBackgroundColor))
+        .onChange(of: hotkeyRecorder.isRecordingComplete) { _, complete in
+            guard complete else { return }
+            let (keyCode, modifiers) = hotkeyRecorder.getHotkeyConfiguration()
+            settings.updateHotkey(keyCode: keyCode, modifiers: modifiers)
+            NotificationCenter.default.post(name: .hotkeySettingsChanged, object: nil)
+            hotkeyRecorder.stopRecording()
+        }
     }
 
-    private func languageDisplayName(_ code: String) -> String {
-        switch code {
-        case "auto": return "Auto-detect"
-        case "en": return "English"
-        case "es": return "Spanish"
-        case "fr": return "French"
-        case "de": return "German"
-        case "it": return "Italian"
-        case "pt": return "Portuguese"
-        case "ru": return "Russian"
-        case "ja": return "Japanese"
-        case "ko": return "Korean"
-        case "zh": return "Chinese"
-        default: return code.uppercased()
+    // MARK: - Sections
+
+    private var transcriptionSection: some View {
+        SectionBlock(label: "Transcription") {
+            SettingsCard(scheme: scheme) {
+                SettingRow(label: "Provider", scheme: scheme) {
+                    ProviderMenu(selection: $settings.transcriptionProviderID, scheme: scheme) {
+                        settings.updateTranscriptionProvider($0)
+                    }
+                }
+                if settings.transcriptionProviderID == "python.whisper" {
+                    RowDivider(scheme: scheme)
+                    SettingRow(label: "Model", indent: 14, scheme: scheme) {
+                        SubMenu(
+                            selection: $settings.pythonWhisper.model,
+                            options: [("tiny","tiny"),("base","base"),("small","small"),
+                                      ("medium","medium"),("large","large")],
+                            scheme: scheme,
+                            onChange: settings.updateWhisperSettings
+                        )
+                    }
+                    RowDivider(scheme: scheme)
+                    SettingRow(label: "Language", indent: 14, scheme: scheme) {
+                        SubMenu(
+                            selection: $settings.pythonWhisper.language,
+                            options: whisperLanguages,
+                            scheme: scheme,
+                            onChange: settings.updateWhisperSettings
+                        )
+                    }
+                }
+                RowDivider(scheme: scheme)
+                SettingRow(label: "Model status", scheme: scheme) {
+                    Text(settings.providerStatus)
+                        .font(.system(size: 12))
+                        .foregroundColor(.textSecondary(for: scheme))
+                }
+            }
+            if settings.transcriptionProviderID == "python.whisper" {
+                Text("Whisper requires the Python sidecar (uv). Slower to start than Parakeet.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.textTertiary(for: scheme))
+                    .padding(.leading, 4)
+                    .padding(.top, 2)
+            }
         }
+    }
+
+    private var hotkeySection: some View {
+        SectionBlock(label: "Hotkey") {
+            SettingsCard(scheme: scheme) {
+                SettingRow(label: "Recording shortcut", scheme: scheme) {
+                    if hotkeyRecorder.isRecording {
+                        Text("Press your shortcut…")
+                            .font(.system(size: 13))
+                            .foregroundColor(.textTertiary(for: scheme))
+                    } else {
+                        HStack(spacing: 6) {
+                            KeycapsView(hotkey: settings.getHotkeyDisplayString(), scheme: scheme)
+                            Button("Change") { hotkeyRecorder.startRecording() }
+                                .font(.system(size: 12))
+                                .foregroundColor(.accentLink(for: scheme))
+                                .buttonStyle(.plain)
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 8)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var aboutSection: some View {
+        SectionBlock(label: "About") {
+            SettingsCard(scheme: scheme) {
+                HStack(spacing: 14) {
+                    Text("uttr")
+                        .font(.system(size: 22, weight: .medium))
+                        .tracking(-0.88)
+                        .foregroundColor(.textPrimary(for: scheme))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Version \(appVersion)")
+                            .font(.system(size: 12))
+                            .foregroundColor(.textSecondary(for: scheme))
+                        Text("github.com/Rakk301/homebrew-uttr")
+                            .font(.system(size: 11))
+                            .foregroundColor(.textTertiary(for: scheme))
+                    }
+                }
+                .padding(.vertical, 18)
+                .padding(.horizontal, 16)
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+
+    private var whisperLanguages: [(String, String)] {
+        [("auto","Auto-detect"),("en","English"),("es","Spanish"),("fr","French"),
+         ("de","German"),("it","Italian"),("pt","Portuguese"),("ru","Russian"),
+         ("ja","Japanese"),("ko","Korean"),("zh","Chinese")]
     }
 }
 
-// MARK: - Helper Components
+// MARK: - Section scaffold
 
-struct SettingRow<Content: View>: View {
+private struct SectionBlock<Content: View>: View {
     let label: String
-    let description: String
     let content: Content
 
-    init(label: String, description: String, @ViewBuilder content: () -> Content) {
+    init(label: String, @ViewBuilder content: () -> Content) {
         self.label = label
-        self.description = description
         self.content = content()
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(.body)
-                    .fontWeight(.medium)
-
-                Spacer()
-
-                content
-            }
-
-            Text(description)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 8)
-    }
-}
-
-struct DeveloperSubsection<Content: View>: View {
-    let title: String
-    let icon: String
-    let content: Content
-
-    init(title: String, icon: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.icon = icon
-        self.content = content()
-    }
+    @Environment(\.colorScheme) var scheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.secondary)
-
-                Text(title)
-                    .font(.headline)
-                    .fontWeight(.semibold)
-
-                Spacer()
-            }
-            .padding(.horizontal, 24)
-
+        VStack(alignment: .leading, spacing: 10) {
+            Text(label.uppercased())
+                .font(.system(size: 11))
+                .tracking(0.44)
+                .foregroundColor(.textTertiary(for: scheme))
+                .padding(.leading, 4)
             content
         }
     }
 }
 
-// MARK: - Keycap Display Component
+// MARK: - Card
 
-struct KeycapDisplay: View {
-    let hotkey: String
+private struct SettingsCard<Content: View>: View {
+    let scheme: ColorScheme
+    let content: Content
 
-    var body: some View {
-        HStack(spacing: 12) {
-            ForEach(parseHotkeyComponents(hotkey), id: \.self) { component in
-                KeycapView(symbol: component)
-            }
-        }
+    init(scheme: ColorScheme, @ViewBuilder content: () -> Content) {
+        self.scheme = scheme
+        self.content = content()
     }
 
-    private func parseHotkeyComponents(_ hotkey: String) -> [String] {
-        var components: [String] = []
-        var currentComponent = ""
-
-        for char in hotkey {
-            if char.isLetter || char.isNumber {
-                if !currentComponent.isEmpty {
-                    components.append(currentComponent)
-                    currentComponent = ""
-                }
-                components.append(String(char))
-            } else {
-                currentComponent += String(char)
-            }
-        }
-
-        if !currentComponent.isEmpty {
-            components.append(currentComponent)
-        }
-
-        return components
+    var body: some View {
+        VStack(spacing: 0) { content }
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.cardBackground(for: scheme))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.cardBorder(for: scheme), lineWidth: 0.5)
+                    )
+            )
     }
 }
 
-struct KeycapView: View {
+// MARK: - Row
+
+private struct SettingRow<Content: View>: View {
+    let label: String
+    var indent: CGFloat = 0
+    let scheme: ColorScheme
+    let content: Content
+
+    init(label: String, indent: CGFloat = 0, scheme: ColorScheme, @ViewBuilder content: () -> Content) {
+        self.label = label
+        self.indent = indent
+        self.scheme = scheme
+        self.content = content()
+    }
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundColor(.textPrimary(for: scheme))
+                .padding(.leading, indent)
+            Spacer()
+            content
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+    }
+}
+
+private struct RowDivider: View {
+    let scheme: ColorScheme
+    var body: some View {
+        Rectangle()
+            .fill(Color.rowSeparator(for: scheme))
+            .frame(height: 0.5)
+    }
+}
+
+// MARK: - Provider picker
+
+private struct ProviderMenu: View {
+    @Binding var selection: String
+    let scheme: ColorScheme
+    let onChange: (String) -> Void
+
+    private let options: [(String, String)] = [
+        ("fluidaudio.parakeet.v3", "Parakeet v3 — multilingual"),
+        ("fluidaudio.parakeet.v2", "Parakeet v2 — English only"),
+        ("python.whisper",          "Whisper — Python sidecar"),
+    ]
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.0) { tag, label in
+                Button(label) { selection = tag; onChange(tag) }
+            }
+        } label: {
+            pickerLabel(options.first(where: { $0.0 == selection })?.1 ?? "", minWidth: 220)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    private func pickerLabel(_ text: String, minWidth: CGFloat) -> some View {
+        HStack(spacing: 6) {
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundColor(.textPrimary(for: scheme))
+                .lineLimit(1)
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 10))
+                .foregroundColor(
+                    scheme == .dark
+                    ? Color(hex: 0xF5F1EA, opacity: 0.55)
+                    : Color(hex: 0x1F1D1A, opacity: 0.60)
+                )
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 8)
+        .padding(.vertical, 4)
+        .frame(minWidth: minWidth)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color.pickerBackground(for: scheme))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .strokeBorder(Color.pickerBorder(for: scheme), lineWidth: 0.5)
+                )
+                .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.04), radius: 2, x: 0, y: 1)
+        )
+    }
+}
+
+private struct SubMenu: View {
+    @Binding var selection: String
+    let options: [(String, String)]
+    let scheme: ColorScheme
+    let onChange: () -> Void
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.0) { tag, label in
+                Button(label) { selection = tag; onChange() }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(options.first(where: { $0.0 == selection })?.1 ?? selection)
+                    .font(.system(size: 13))
+                    .foregroundColor(.textPrimary(for: scheme))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10))
+                    .foregroundColor(
+                        scheme == .dark
+                        ? Color(hex: 0xF5F1EA, opacity: 0.55)
+                        : Color(hex: 0x1F1D1A, opacity: 0.60)
+                    )
+            }
+            .padding(.leading, 10)
+            .padding(.trailing, 8)
+            .padding(.vertical, 4)
+            .frame(minWidth: 140)
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.pickerBackground(for: scheme))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(Color.pickerBorder(for: scheme), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.04), radius: 2, x: 0, y: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+}
+
+// MARK: - Keycaps
+
+private struct KeycapsView: View {
+    let hotkey: String
+    let scheme: ColorScheme
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(keycaps.enumerated()), id: \.offset) { i, cap in
+                if i > 0 {
+                    Text("+")
+                        .font(.system(size: 11))
+                        .foregroundColor(.textTertiary(for: scheme))
+                }
+                KeycapView(symbol: cap, scheme: scheme)
+            }
+        }
+    }
+
+    private var keycaps: [String] {
+        let modifiers: Set<Character> = ["⌘", "⇧", "⌥", "⌃"]
+        var result: [String] = []
+        var keyStart = hotkey.startIndex
+        for idx in hotkey.indices {
+            guard modifiers.contains(hotkey[idx]) else { break }
+            result.append(String(hotkey[idx]))
+            keyStart = hotkey.index(after: idx)
+        }
+        let key = String(hotkey[keyStart...])
+        if !key.isEmpty { result.append(key) }
+        return result
+    }
+}
+
+private struct KeycapView: View {
     let symbol: String
+    let scheme: ColorScheme
 
     var body: some View {
         Text(symbol)
-            .font(.system(size: 16, weight: .semibold, design: .rounded))
-            .foregroundColor(Color(red: 0.2, green: 0.5, blue: 0.9))
-            .frame(minWidth: 32, minHeight: 32)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .font(.system(size: 13))
+            .foregroundColor(.textPrimary(for: scheme))
+            .frame(minWidth: 32, minHeight: 26)
+            .padding(.horizontal, 6)
             .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.3, green: 0.5, blue: 0.85),
-                                    Color(red: 0.25, green: 0.45, blue: 0.8)
-                                ]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .padding(-2)
-
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(red: 0.7, green: 0.85, blue: 0.95),
-                                    Color(red: 0.6, green: 0.8, blue: 0.95)
-                                ]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    RoundedRectangle(cornerRadius: 7)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.white.opacity(0.6),
-                                    Color.white.opacity(0.0)
-                                ]),
-                                startPoint: .top,
-                                endPoint: .center
-                            )
-                        )
-                }
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(Color.keycapFace(for: scheme))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .strokeBorder(Color.keycapBorder(for: scheme), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.04), radius: 0, x: 0, y: 1)
             )
-            .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 2)
-            .shadow(color: Color.black.opacity(0.1), radius: 1, x: 0, y: 1)
     }
 }
 
 #Preview {
-    SettingsTabView()
+    SettingsTabView(settings: SettingsManager())
+        .frame(width: 520, height: 480)
 }
