@@ -39,40 +39,12 @@ struct SettingsTabView: View {
                         settings.updateTranscriptionProvider($0)
                     }
                 }
-                if settings.transcriptionProviderID == "python.whisper" {
-                    RowDivider(scheme: scheme)
-                    SettingRow(label: "Model", indent: 14, scheme: scheme) {
-                        SubMenu(
-                            selection: $settings.pythonWhisper.model,
-                            options: [("tiny","tiny"),("base","base"),("small","small"),
-                                      ("medium","medium"),("large","large")],
-                            scheme: scheme,
-                            onChange: settings.updateWhisperSettings
-                        )
-                    }
-                    RowDivider(scheme: scheme)
-                    SettingRow(label: "Language", indent: 14, scheme: scheme) {
-                        SubMenu(
-                            selection: $settings.pythonWhisper.language,
-                            options: whisperLanguages,
-                            scheme: scheme,
-                            onChange: settings.updateWhisperSettings
-                        )
-                    }
-                }
                 RowDivider(scheme: scheme)
                 SettingRow(label: "Model status", scheme: scheme) {
                     Text(settings.providerStatus)
                         .font(.system(size: 12))
                         .foregroundColor(.textSecondary(for: scheme))
                 }
-            }
-            if settings.transcriptionProviderID == "python.whisper" {
-                Text("Whisper requires the Python sidecar (uv). Slower to start than Parakeet.")
-                    .font(.system(size: 11))
-                    .foregroundColor(.textTertiary(for: scheme))
-                    .padding(.leading, 4)
-                    .padding(.top, 2)
             }
         }
     }
@@ -130,11 +102,6 @@ struct SettingsTabView: View {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
 
-    private var whisperLanguages: [(String, String)] {
-        [("auto","Auto-detect"),("en","English"),("es","Spanish"),("fr","French"),
-         ("de","German"),("it","Italian"),("pt","Portuguese"),("ru","Russian"),
-         ("ja","Japanese"),("ko","Korean"),("zh","Chinese")]
-    }
 }
 
 // MARK: - Section scaffold
@@ -234,7 +201,6 @@ private struct ProviderMenu: View {
     private let options: [(String, String)] = [
         ("fluidaudio.parakeet.v3", "Parakeet v3 — multilingual"),
         ("fluidaudio.parakeet.v2", "Parakeet v2 — English only"),
-        ("python.whisper",          "Whisper — Python sidecar"),
     ]
 
     var body: some View {
@@ -277,51 +243,6 @@ private struct ProviderMenu: View {
                 )
                 .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.04), radius: 2, x: 0, y: 1)
         )
-    }
-}
-
-private struct SubMenu: View {
-    @Binding var selection: String
-    let options: [(String, String)]
-    let scheme: ColorScheme
-    let onChange: () -> Void
-
-    var body: some View {
-        Menu {
-            ForEach(options, id: \.0) { tag, label in
-                Button(label) { selection = tag; onChange() }
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Text(options.first(where: { $0.0 == selection })?.1 ?? selection)
-                    .font(.system(size: 13))
-                    .foregroundColor(.textPrimary(for: scheme))
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10))
-                    .foregroundColor(
-                        scheme == .dark
-                        ? Color(hex: 0xF5F1EA, opacity: 0.55)
-                        : Color(hex: 0x1F1D1A, opacity: 0.60)
-                    )
-            }
-            .padding(.leading, 10)
-            .padding(.trailing, 8)
-            .padding(.vertical, 4)
-            .frame(minWidth: 140)
-            .background(
-                RoundedRectangle(cornerRadius: 5)
-                    .fill(Color.pickerBackground(for: scheme))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .strokeBorder(Color.pickerBorder(for: scheme), lineWidth: 0.5)
-                    )
-                    .shadow(color: .black.opacity(scheme == .dark ? 0 : 0.04), radius: 2, x: 0, y: 1)
-            )
-        }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
     }
 }
 
