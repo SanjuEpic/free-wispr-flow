@@ -41,7 +41,7 @@ git push origin v1.x.x
 
 ### 5. Create GitHub Release
 
-1. Go to [GitHub Releases](https://github.com/ShishirAravindan/homebrew-uttr/releases)
+1. Go to [GitHub Releases](https://github.com/Rakk301/homebrew-uttr/releases)
 2. Draft a new release against the tag
 3. Attach `uttr.zip`
 4. Publish

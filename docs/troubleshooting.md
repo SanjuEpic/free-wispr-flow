@@ -30,7 +30,7 @@ If the app isn't in the list, try pressing the hotkey once — this should trigg
 2. Ensure uttr is toggled **on**
 3. If not listed, reset permissions:
    ```bash
-   tccutil reset Microphone io.github.ShishirAravindan.uttr
+   tccutil reset Microphone io.github.Rakk301.uttr
    ```
 
 ### "Recording failed" error
@@ -83,8 +83,8 @@ Then restart the app.
 
 If you're still stuck:
 
-1. Check [existing issues](https://github.com/ShishirAravindan/homebrew-uttr/issues)
-2. Open a [new issue](https://github.com/ShishirAravindan/homebrew-uttr/issues/new) with:
+1. Check [existing issues](https://github.com/Rakk301/homebrew-uttr/issues)
+2. Open a [new issue](https://github.com/Rakk301/homebrew-uttr/issues/new) with:
    - macOS version
    - Steps to reproduce
    - Relevant log output

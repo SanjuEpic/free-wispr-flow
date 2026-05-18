@@ -7,7 +7,7 @@ This guide walks you through installing and setting up uttr.
 ### Option 1: Homebrew (Recommended)
 
 ```bash
-brew tap ShishirAravindan/uttr
+brew tap Rakk301/uttr
 brew install --cask uttr
 ```
 
@@ -15,7 +15,7 @@ No additional dependencies required.
 
 ### Option 2: Download from Releases
 
-1. Download the latest `.zip` from [GitHub Releases](https://github.com/ShishirAravindan/homebrew-uttr/releases)
+1. Download the latest `.zip` from [GitHub Releases](https://github.com/Rakk301/homebrew-uttr/releases)
 2. Extract and move `uttr.app` to `/Applications`
 
 ### Allowing the App (Gatekeeper)

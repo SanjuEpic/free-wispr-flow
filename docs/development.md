@@ -29,7 +29,7 @@ uttr/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/ShishirAravindan/homebrew-uttr.git
+git clone https://github.com/Rakk301/homebrew-uttr.git
 cd homebrew-uttr
 ```
 

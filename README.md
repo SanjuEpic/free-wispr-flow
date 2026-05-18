@@ -9,7 +9,7 @@ Powered by [Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) runnin
 ## Installation
 
 ```bash
-brew tap ShishirAravindan/uttr
+brew tap Rakk301/uttr
 brew install --cask uttr
 ```
 
