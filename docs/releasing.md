@@ -4,12 +4,7 @@ This guide covers how to create a new release of uttr.
 
 ## Version Numbering
 
-We use [Semantic Versioning](https://semver.org/):
-
-- **MAJOR.MINOR.PATCH** (e.g., `1.2.3`)
-- **MAJOR** — Breaking changes
-- **MINOR** — New features, backwards compatible
-- **PATCH** — Bug fixes, backwards compatible
+We use [Semantic Versioning](https://semver.org/): **MAJOR.MINOR.PATCH**
 
 ## Release Checklist
 
@@ -17,147 +12,75 @@ We use [Semantic Versioning](https://semver.org/):
 
 - [ ] Update version in Xcode project (General → Version)
 - [ ] Update `CHANGELOG.md` with changes since last release
-- [ ] Commit changes: `git commit -m "chore: prepare v1.x.x release"`
+- [ ] Commit: `git commit -m "chore: prepare v1.x.x release"`
 
 ### 2. Build the App
 
-1. Open `uttr.xcodeproj` in Xcode
-2. Select **Product → Archive**
-3. In the Organizer, select the archive
-4. Click **Distribute App**
-5. Choose **Copy App** (we're not notarizing)
-6. Export to a folder
+```bash
+./build.sh -c Release
+```
 
-### 3. Create ZIP
+Or in Xcode: **Product → Archive**, then **Distribute App → Copy App**.
+
+### 3. Create ZIP and Hash
 
 ```bash
 cd /path/to/exported
 zip -r uttr.zip uttr.app
-```
-
-### 4. Get SHA256 Hash
-
-```bash
 shasum -a 256 uttr.zip
 ```
 
-Save this hash — you'll need it for Homebrew.
+Save the SHA256 hash — you'll need it for the Homebrew cask.
 
-### 5. Create Git Tag
+### 4. Create Git Tag
 
 ```bash
 git tag -a v1.x.x -m "Release v1.x.x"
 git push origin v1.x.x
 ```
 
-### 6. Create GitHub Release
+### 5. Create GitHub Release
 
-1. Go to [GitHub Releases](https://github.com/Rakk301/homebrew-uttr/releases)
-2. Click **Draft a new release**
-3. Select the tag you just created
-4. Title: `v1.x.x`
-5. Description: Copy from CHANGELOG.md
-6. Attach `uttr.zip`
-7. Click **Publish release**
+1. Go to [GitHub Releases](https://github.com/ShishirAravindan/homebrew-uttr/releases)
+2. Draft a new release against the tag
+3. Attach `uttr.zip`
+4. Publish
 
-### 7. Update Homebrew Cask
+### 6. Update Homebrew Cask
 
-Update the Cask formula in your tap repository:
+In the tap repository (`Casks/uttr.rb`):
 
-1. Edit `Casks/uttr.rb`:
-1. Edit `Casks/uttr.rb`:
-   ```ruby
-   version "1.x.x"
-   sha256 "YOUR_SHA256_HASH_HERE"
-   ```
-
-2. Commit and push:
-   ```bash
-   git commit -am "Update to v1.x.x"
-   git push
-   ```
-
-Users can now install/upgrade via:
-```bash
-brew upgrade --cask uttr
-brew upgrade --cask uttr
+```ruby
+version "1.x.x"
+sha256 "YOUR_SHA256_HASH_HERE"
 ```
 
-## Setting Up Your Homebrew Tap
-
-If you haven't set up your tap yet:
-
-### 1. Create the Tap Repository
-
-Create a new GitHub repository named `homebrew-uttr`.
-Create a new GitHub repository named `homebrew-uttr`.
-
-### 2. Add the Cask Formula
-
 ```bash
-git clone https://github.com/Rakk301/homebrew-uttr.git
-cd homebrew-uttr
-git clone https://github.com/Rakk301/homebrew-uttr.git
-cd homebrew-uttr
-mkdir Casks
-cp /path/to/homebrew-uttr/docs/homebrew/uttr.rb Casks/
-```
-
-### 3. Update and Push
-
-Edit `Casks/uttr.rb`:
-Edit `Casks/uttr.rb`:
-- Set correct `version`
-- Set correct `sha256`
-
-```bash
-git add .
-git commit -m "Add uttr cask"
-git commit -m "Add uttr cask"
+git commit -am "Update to v1.x.x"
 git push
 ```
 
-### 4. Test Installation
+Users can then upgrade via:
 
 ```bash
-brew tap Rakk301/uttr
-brew install --cask uttr
-brew tap Rakk301/uttr
-brew install --cask uttr
+brew upgrade --cask uttr
 ```
-
-## Automating Releases (Future)
-
-See the CI/CD setup for automating:
-- Build verification on PRs
-- Tag-triggered releases
-- Automatic changelog generation
-- Homebrew formula updates
 
 ## Troubleshooting Releases
 
 ### Archive fails to build
 
 - Check all Swift files compile without errors
-- Ensure signing settings are correct (can be "Sign to Run Locally")
+- Ensure signing is set to "Sign to Run Locally"
 
 ### Users report "damaged" app
 
-The app was modified after download. Users should:
 ```bash
 xattr -cr /Applications/uttr.app
 ```
 
 ### Homebrew formula doesn't update
 
-Users may need to:
 ```bash
-brew update
-brew upgrade --cask uttr
-brew upgrade --cask uttr
-```
-
-Or force reinstall:
-```bash
-brew reinstall --cask uttr
+brew update && brew upgrade --cask uttr
 ```

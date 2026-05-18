@@ -6,29 +6,21 @@ This guide covers building and developing uttr from source.
 
 - **Xcode 15+** — [Download from Mac App Store](https://apps.apple.com/app/xcode/id497799835)
 - **macOS 14 (Sonoma)+** — Required for deployment target
-- **uv** — Python package manager
-
-Install uv:
-
-```bash
-brew install uv
-```
+- **Apple Silicon** — Required for FluidAudio / Neural Engine
 
 ## Repository Structure
 
 ```
 uttr/
-├── Swift/                      # macOS app source
-│   ├── uttr.swift   # App entry point
-│   ├── AudioRecorder.swift     # Audio capture
-│   ├── HotkeyManager.swift     # Global hotkeys
+├── Swift/                          # macOS app source
+│   ├── uttr.swift                  # App entry point
+│   ├── AudioRecorder.swift         # Audio capture
+│   ├── HotkeyManager.swift         # Global hotkeys
+│   ├── Transcription/              # Provider protocol + implementations
 │   └── ...
-├── stt-server-py/              # Python server
-│   ├── transcription_server.py # Server entry point
-│   ├── whisper_STTProvider.py  # Whisper integration
-│   └── pyproject.toml          # Python dependencies
-├── docs/                       # Documentation
-├── uttr.xcodeproj/  # Xcode project
+├── docs/                           # Documentation
+├── Casks/uttr.rb                   # Homebrew cask formula
+├── uttr.xcodeproj/                 # Xcode project
 └── README.md
 ```
 
@@ -37,68 +29,26 @@ uttr/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Rakk301/homebrew-uttr.git
+git clone https://github.com/ShishirAravindan/homebrew-uttr.git
 cd homebrew-uttr
 ```
 
-### 2. Install Python Dependencies
-
-```bash
-cd stt-server-py
-uv sync
-cd ..
-```
-
-This creates a virtual environment and installs all Python dependencies.
-
-### 3. Open in Xcode
+### 2. Open in Xcode
 
 ```bash
 open uttr.xcodeproj
 ```
 
-### 4. Build and Run
+### 3. Build and Run
 
-- Select **uttr** scheme
+- Select the **uttr** scheme
 - Press `Cmd+R` to build and run
 - Grant permissions when prompted
 
-## Development Workflow
-
-### Swift Development
-
-Edit Swift files in Xcode. The app will:
-- Launch the Python server automatically from the bundled `stt-server-py/`
-- Reload settings when changed
-- Show errors in the console
-
-### Python Development
-
-For iterating on the Python server, run it manually:
+Or use the build script:
 
 ```bash
-cd stt-server-py
-uv run python transcription_server.py settings.yaml --host localhost --port 3001
-```
-
-Then configure the app to connect to your manual server:
-1. Open Settings in the app
-2. Set Server Host to `localhost`
-3. Set Server Port to `3001`
-
-This lets you modify Python code without rebuilding the Swift app.
-
-### Testing Transcription
-
-Test the Python server directly:
-
-```bash
-# Health check
-curl http://localhost:3001/health
-
-# Transcribe audio file
-curl -X POST http://localhost:3001/transcribe \
-  -F "audio=@test.wav"
+./build.sh -c Debug
 ```
 
 ## Required Permissions
@@ -120,59 +70,32 @@ Logs appear in Xcode console. Filter by component:
 
 - `[AudioRecorder]` — Recording issues
 - `[HotkeyManager]` — Hotkey registration
-- `[TranscriptionServer]` — Server launch issues
-- `[TranscriptionServerClient]` — HTTP errors
-
-### Python Logs
-
-When running the server manually, logs go to stdout:
-
-```bash
-uv run python transcription_server.py settings.yaml --port 3001
-```
+- `[FluidAudioProvider]` — Transcription issues
 
 ### Common Issues
-
-**Server won't start:**
-- Check `uv` is installed: `which uv`
-- Check port isn't in use: `lsof -i :3001`
 
 **Hotkey not working:**
 - Verify Accessibility permission is granted
 - Check another app isn't using the same hotkey
 
-**Transcription fails:**
-- Check microphone permission
-- Check Whisper model downloaded (first run takes time)
+**Transcription fails on first run:**
+- The Parakeet model (~600 MB) downloads on first use — wait for completion
+- Check network connectivity if download stalls
 
 ## Code Style
 
-### Swift
-
 - One file per component/responsibility
-- Use `Logger` for all logging
-- Prefer async/await for async operations
+- Use `Logger` for all logging, not `print()`
+- Prefer `async/await` for asynchronous operations
 - Follow existing patterns in the codebase
-
-### Python
-
-- Type hints on all functions
-- Use `logging` module, not `print()`
-- Keep CLI scripts simple and testable
 
 ## Building for Distribution
 
-To create a distributable app:
+```bash
+./build.sh -c Release
+```
 
-1. In Xcode, select **Product → Archive**
-2. Export as **Copy App** (for unsigned distribution)
-3. Create a ZIP:
-   ```bash
-   cd /path/to/export
-   zip -r uttr.zip uttr.app
-   ```
-
-See [Releasing Guide](releasing.md) for full release process.
+This builds, then installs to `/Applications/uttr.app`. See [Releasing Guide](releasing.md) for the full release process.
 
 ## Related Docs
 

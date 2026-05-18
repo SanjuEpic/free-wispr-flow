@@ -7,20 +7,16 @@ This guide walks you through installing and setting up uttr.
 ### Option 1: Homebrew (Recommended)
 
 ```bash
-brew tap Rakk301/uttr
+brew tap ShishirAravindan/uttr
 brew install --cask uttr
 ```
 
-This automatically installs the app and its dependencies.
+No additional dependencies required.
 
 ### Option 2: Download from Releases
 
-1. Download the latest `.zip` from [GitHub Releases](https://github.com/Rakk301/homebrew-uttr/releases)
+1. Download the latest `.zip` from [GitHub Releases](https://github.com/ShishirAravindan/homebrew-uttr/releases)
 2. Extract and move `uttr.app` to `/Applications`
-3. Install the `uv` dependency:
-   ```bash
-   brew install uv
-   ```
 
 ### Allowing the App (Gatekeeper)
 
@@ -33,29 +29,28 @@ Since the app is not notarized, macOS will block it on first launch:
 
 ## Required Permissions
 
-The app needs these permissions to function:
-
 ### Microphone Access
 
 Required for recording your speech.
 
-- The app will prompt automatically on first recording attempt
+- The app prompts automatically on first recording attempt
 - Or grant manually: **System Settings → Privacy & Security → Microphone**
 
 ### Accessibility Access
 
 Required for global hotkeys and pasting text at your cursor.
 
-- The app will prompt automatically
+- The app prompts automatically
 - Or grant manually: **System Settings → Privacy & Security → Accessibility**
-- Add uttr to the allowed list
 
 ## First Run
 
-1. **Launch the app** — Look for the icon in your menu bar
-2. **Grant permissions** — Follow the prompts for Microphone and Accessibility
-3. **Wait for model download** — On first transcription, Whisper downloads the model (~500MB for "small")
-4. **Test it** — Press your hotkey (default: `⌥L`), speak, press again to stop
+1. **Launch the app** — look for the icon in your menu bar
+2. **Grant permissions** — follow the prompts for Microphone and Accessibility
+3. **Press your hotkey** (default: `⌥L`) to start recording
+4. **Speak**, then press the hotkey again to stop
+
+The first transcription downloads the Parakeet model (~600 MB). Subsequent transcriptions are instant.
 
 ## Using the App
 
@@ -65,15 +60,7 @@ Required for global hotkeys and pasting text at your cursor.
 2. Press the hotkey to **start recording** (menu bar icon changes)
 3. Speak clearly into your microphone
 4. Press the hotkey again to **stop recording**
-5. Wait briefly for transcription
-6. Text is automatically pasted at your cursor
-
-### Menu Bar
-
-Click the menu bar icon to:
-- See recording status
-- Start/stop recording manually
-- Open Settings
+5. Transcribed text is automatically pasted at your cursor
 
 ### Settings
 
@@ -81,22 +68,8 @@ Access via menu bar icon → Settings:
 
 | Setting | Description |
 |---------|-------------|
-| **Whisper Model** | tiny, base, small (default), medium, large — larger = more accurate but slower |
-| **Language** | Auto-detect or specify (e.g., "en", "es", "fr") |
-| **Hotkey** | Click to record a new shortcut |
-| **LLM Post-processing** | Enable to clean up transcription with a local LLM |
-
-## Whisper Models
-
-The app uses OpenAI's Whisper for transcription. Models are downloaded on first use.
-
-| Model | Size | Speed | Accuracy | Best For |
-|-------|------|-------|----------|----------|
-| tiny | ~75MB | Fastest | Lower | Quick notes, testing |
-| base | ~150MB | Fast | Good | General use |
-| small | ~500MB | Medium | Better | Recommended default |
-| medium | ~1.5GB | Slow | High | Important transcriptions |
-| large | ~3GB | Slowest | Highest | Maximum accuracy |
+| **Provider** | Parakeet v3 (multilingual) or v2 (English only) |
+| **Hotkey** | Click "Change" to record a new shortcut |
 
 ## Next Steps
 

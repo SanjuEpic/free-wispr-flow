@@ -1,55 +1,41 @@
+<img src="docs/assets/logo.png" alt="uttr" width="96">
+
 # uttr
 
-A macOS menu bar app for speech-to-text transcription. Press a hotkey, speak, and the transcribed text is automatically pasted at your cursor.
+A macOS menu bar app for fast, local speech-to-text transcription. Press a hotkey, speak, and the transcribed text is automatically pasted at your cursor — no cloud, no Python, no dependencies.
 
-Runs locally using [OpenAI Whisper](https://github.com/openai/whisper) with optional LLM post-processing.
-
-## Features
-
-- **Global hotkey** — Trigger recording from anywhere with a customizable shortcut
-- **Local processing** — All transcription happens on your Mac, no cloud services
-- **Auto-paste** — Transcribed text is pasted directly at your cursor
-- **LLM post-processing** — Optional cleanup/formatting via local LLM (Ollama)
-- **Menu bar app** — Stays out of your way, lives in the menu bar
+Powered by [Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) running on the Apple Neural Engine via [FluidAudio](https://github.com/FluidAudio/FluidAudio).
 
 ## Installation
 
-### Homebrew (Recommended)
-
 ```bash
-brew tap Rakk301/uttr
+brew tap ShishirAravindan/uttr
 brew install --cask uttr
 ```
 
-### From Source
-
-See [Development Guide](docs/development.md) for building from source.
+That's it. No Python, no `uv`, no setup.
 
 ## Quick Start
 
-1. Launch **uttr** from Applications
-2. Grant permissions when prompted:
-   - **Microphone** — For recording speech
-   - **Accessibility** — For global hotkey and paste functionality
-3. Click the menu bar icon to configure your hotkey (default: `⌥L`)
-4. Press the hotkey to start recording, press again to stop
-5. Transcribed text appears at your cursor
+1. Launch **uttr** — the icon appears in your menu bar
+2. Grant permissions when prompted: **Microphone** and **Accessibility**
+3. Press the hotkey (default: `⌥L`) to start recording
+4. Speak, then press the hotkey again to stop
+5. Transcribed text is pasted at your cursor
+
+The first transcription downloads the Parakeet model (~600 MB). Subsequent transcriptions are instant.
 
 ## Configuration
 
-The app stores settings in `~/Library/Application Support/uttr/settings.yaml`.
+Settings are stored at `~/Library/Application Support/uttr/settings.yaml`.
 
-Configure via the menu bar icon → Settings:
-- **Whisper model** — tiny, base, small, medium, large
-- **Language** — Auto-detect or specify
-- **Hotkey** — Customize your trigger shortcut
-- **LLM** — Enable/disable post-processing
+Configure via menu bar → Settings, or edit the YAML directly.
 
 See [Configuration Guide](docs/configuration.md) for all options.
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md) — Detailed setup guide
+- [Getting Started](docs/getting-started.md) — Detailed setup and first-run guide
 - [Configuration](docs/configuration.md) — All settings explained
 - [Architecture](docs/architecture.md) — How it works (for contributors)
 - [Development](docs/development.md) — Building from source
@@ -58,11 +44,11 @@ See [Configuration Guide](docs/configuration.md) for all options.
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- ~2GB disk space for Whisper models (downloaded on first use)
+- Apple Silicon (M1 or later) — required for the Neural Engine
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+Contributions are welcome. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
 ## License
 

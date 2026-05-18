@@ -13,20 +13,6 @@ The app is not notarized. To open it:
 3. Click **Open Anyway**
 4. Click **Open** in the confirmation dialog
 
-### "uv: command not found" or server won't start
-
-The `uv` package manager is required. Install it:
-
-```bash
-brew install uv
-```
-
-If installed via Homebrew but still not found, check your PATH:
-
-```bash
-echo $PATH | grep -q "/opt/homebrew/bin" || echo "Homebrew not in PATH"
-```
-
 ## Permission Issues
 
 ### Global hotkey not working
@@ -42,9 +28,9 @@ If the app isn't in the list, try pressing the hotkey once — this should trigg
 
 1. Open **System Settings → Privacy & Security → Microphone**
 2. Ensure uttr is toggled **on**
-3. If not listed, remove and re-add the app, or reset permissions:
+3. If not listed, reset permissions:
    ```bash
-   tccutil reset Microphone com.yourname.uttr
+   tccutil reset Microphone io.github.ShishirAravindan.uttr
    ```
 
 ### "Recording failed" error
@@ -53,114 +39,23 @@ If the app isn't in the list, try pressing the hotkey once — this should trigg
 - Verify your input device is selected in **System Settings → Sound → Input**
 - Try unplugging and reconnecting external microphones
 
-## Server Issues
-
-### "Server connection failed" or transcription hangs
-
-Check if the server is running:
-
-```bash
-curl http://localhost:3001/health
-```
-
-If no response:
-- The server may still be starting (first launch downloads models)
-- Check Console.app for errors from uttr
-- Try restarting the app
-
-### Port already in use
-
-If the configured port is busy, the app auto-selects a free port. To manually fix:
-
-```bash
-# Find what's using the port
-lsof -i :3001
-
-# Kill the process if needed
-kill -9 <PID>
-```
-
-Or change the port in Settings.
-
-### Python/uv errors
-
-Re-sync dependencies:
-
-```bash
-cd /Applications/uttr.app/Contents/Resources/stt-server-py
-uv sync
-```
-
-If building from source:
-
-```bash
-cd stt-server-py
-uv sync
-```
-
 ## Transcription Issues
 
-### Slow transcription
+### App seems to hang on first transcription
 
-1. **Use a smaller model** — Settings → Whisper Model → "small" or "base"
-2. **Disable LLM post-processing** — Settings → LLM → Enabled: Off
-3. **Check CPU usage** — Another process may be competing for resources
+This is normal. The first transcription triggers a one-time download of the Parakeet model (~600 MB). Wait for it to complete — subsequent transcriptions are instant.
 
 ### Poor accuracy
 
-1. **Use a larger model** — "medium" or "large" are more accurate
-2. **Speak clearly** — Whisper works best with clear speech
-3. **Reduce background noise** — Use a better microphone or quieter environment
-4. **Specify language** — Set the language explicitly instead of "auto"
-
-### First transcription is very slow
-
-This is normal. On first use, Whisper downloads the model:
-
-| Model | Download Size |
-|-------|---------------|
-| tiny | ~75 MB |
-| base | ~150 MB |
-| small | ~500 MB |
-| medium | ~1.5 GB |
-| large | ~3 GB |
-
-Subsequent transcriptions are much faster.
+1. **Speak clearly** — Parakeet works best with clear speech and minimal background noise
+2. **Use a better microphone** — Built-in mic works, but an external mic improves results
+3. **Switch providers** — Try Parakeet v3 (multilingual) if using v2
 
 ### Text not pasting
 
 1. **Check cursor position** — Click where you want text before starting
 2. **Check Accessibility permission** — Required for paste simulation
 3. **Try a different app** — Some apps block paste simulation
-
-## LLM Post-Processing Issues
-
-### LLM not working
-
-LLM post-processing requires [Ollama](https://ollama.ai) running locally:
-
-```bash
-# Install Ollama
-brew install ollama
-
-# Start Ollama
-ollama serve
-
-# Pull a model
-ollama pull llama3.2
-```
-
-Verify Ollama is running:
-
-```bash
-curl http://localhost:11434/api/tags
-```
-
-### LLM making transcription worse
-
-Disable it: Settings → LLM → Enabled: Off
-
-Or try a different model in Settings → LLM → Model.
 
 ## Log Files
 
@@ -179,14 +74,7 @@ log show --predicate 'process == "uttr"' --last 10m
 If nothing works, reset to defaults:
 
 ```bash
-# Remove settings
 rm ~/Library/Application\ Support/uttr/settings.yaml
-
-# Remove app data
-rm -rf ~/Library/Application\ Support/uttr
-
-# Re-download Whisper models (they're cached by the Python package)
-rm -rf ~/.cache/whisper
 ```
 
 Then restart the app.
@@ -195,8 +83,8 @@ Then restart the app.
 
 If you're still stuck:
 
-1. Check [existing issues](https://github.com/Rakk301/homebrew-uttr/issues)
-2. Open a [new issue](https://github.com/Rakk301/homebrew-uttr/issues/new) with:
+1. Check [existing issues](https://github.com/ShishirAravindan/homebrew-uttr/issues)
+2. Open a [new issue](https://github.com/ShishirAravindan/homebrew-uttr/issues/new) with:
    - macOS version
    - Steps to reproduce
    - Relevant log output

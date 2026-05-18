@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in contributing to uttr! This guide will help you get started.
+Contributions are welcome. This guide will help you get started.
 
 ## Getting Started
 
@@ -10,7 +10,7 @@ Thank you for your interest in contributing to uttr! This guide will help you ge
    git clone https://github.com/YOUR_USERNAME/homebrew-uttr.git
    cd homebrew-uttr
    ```
-3. **Set up the development environment** — See [Development Guide](docs/development.md)
+3. **Set up the development environment** — See [Development Guide](development.md)
 
 ## Making Changes
 
@@ -27,35 +27,22 @@ git checkout -b fix/your-bug-fix
 - Keep changes focused and atomic
 - Follow the code style guidelines below
 - Update documentation if needed
-- Add/update tests if applicable
 
 ### 3. Test Your Changes
 
-**Swift changes:**
 - Build and run in Xcode
 - Test the affected functionality manually
-
-**Python changes:**
-- Run the server manually and test endpoints
-- Verify transcription still works
-
-```bash
-cd stt-server-py
-uv run python transcription_server.py settings.yaml --port 3001
-```
+- Verify transcription still works end-to-end
 
 ### 4. Commit Your Changes
 
-Write clear commit messages:
-
 ```bash
 # Good
-git commit -m "Add support for custom prompts in LLM processing"
+git commit -m "Add language detection hint to FluidAudioProvider"
 git commit -m "Fix hotkey not registering on app restart"
 
 # Bad
 git commit -m "Fixed stuff"
-git commit -m "WIP"
 ```
 
 ### 5. Push and Create a Pull Request
@@ -64,78 +51,25 @@ git commit -m "WIP"
 git push origin feature/your-feature-name
 ```
 
-Then open a Pull Request on GitHub with:
-- Clear description of what changed and why
-- Steps to test the changes
-- Screenshots if UI changes are involved
+Open a Pull Request with a clear description of what changed and why, and steps to test.
 
 ## Code Style
 
-### Swift
-
-- **One file per component** — Each Swift file should have a single responsibility
-- **Use Logger** — All logging through the `Logger` class
-- **Prefer async/await** — For asynchronous operations
-- **Follow existing patterns** — Look at similar code in the codebase
-
-Example:
-```swift
-// Good
-logger.log("Starting transcription", level: .info)
-
-// Bad
-print("Starting transcription")
-```
-
-### Python
-
-- **Type hints** — Add type hints to all function signatures
-- **Use logging** — Not `print()` statements
-- **Keep it simple** — CLI scripts should be easy to test independently
-
-Example:
-```python
-# Good
-def transcribe_audio(audio_path: str, model: str = "small") -> str:
-    logger.info(f"Transcribing {audio_path} with model {model}")
-    ...
-
-# Bad
-def transcribe_audio(audio_path, model="small"):
-    print(f"Transcribing {audio_path}")
-    ...
-```
+- **One file per component** — each Swift file has a single responsibility
+- **Use Logger** — all logging through the `Logger` class, not `print()`
+- **Prefer async/await** — for asynchronous operations
+- **Follow existing patterns** — look at similar code in the codebase
 
 ## Architecture Guidelines
 
-- **Swift handles system integration** — Hotkeys, audio, clipboard, UI
-- **Python handles ML** — Whisper, LLM, audio processing
-- **Communication via HTTP** — Clean separation between Swift and Python
+uttr is a single-tier Swift app. All transcription runs in-process via FluidAudio on the Neural Engine. There is no server tier, no Python, and no network communication after the initial model download.
 
-See [Architecture](docs/architecture.md) for details.
+See [Architecture](architecture.md) for the full component map.
 
 ## What to Contribute
 
-### Good First Issues
-
-Look for issues labeled `good first issue` — these are great for newcomers.
-
-### Ideas Welcome
-
-- Bug fixes
-- Documentation improvements
-- Performance optimizations
-- New features (discuss in an issue first)
-
-### Please Avoid
-
-- Large refactors without prior discussion
-- Breaking changes to the configuration format
-- Adding heavy dependencies without justification
+Good starting points: bug fixes, documentation improvements, performance optimizations. For new features, open an issue to discuss first.
 
 ## Questions?
 
-- Open an issue for bugs or feature requests
-- Start a discussion for questions or ideas
-
-Thank you for contributing!
+Open an issue for bugs or feature requests, or start a discussion for questions.
