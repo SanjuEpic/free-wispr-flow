@@ -1,26 +1,42 @@
 # Python
 __pycache__/
-.python-version
-stt-server-py/__pycache__/
-stt-server-py/uv.lock
+*.py[cod]
+*.egg-info/
+*.egg
 
-# Environments
+# Virtual environments
 .env
 .venv
+.python-version
+
+# PyInstaller build artifacts
+build/
+build-gpu/
+dist/
+dist-gpu/
+*.spec.bak
+
+# Inno Setup output
+Output/
 
 # Logs
 Logs/
+*.log
 
-# Xcode user data
-uttr.xcodeproj/xcuserdata/
-uttr.xcodeproj/project.xcworkspace/xcuserdata/
+# Benchmark audio recordings (large, user-specific)
+benchmarks/samples/*.wav
 
 # macOS
 .DS_Store
 
-# Build artifacts
-*.app
-build/
+# Xcode (legacy, from macOS version)
+uttr.xcodeproj/xcuserdata/
+uttr.xcodeproj/project.xcworkspace/xcuserdata/
 DerivedData/
+*.app
 
+# Cursor IDE
+.cursor/
+
+# Claude Code
 .claude/worktrees/

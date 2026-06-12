@@ -1,0 +1,36 @@
+[project]
+name = "uttr-win"
+version = "0.1.0"
+description = "Local speech-to-text for Windows. Press a hotkey, speak, text appears at your cursor."
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = [
+    "faster-whisper>=1.0.0",
+    "sounddevice>=0.4.6",
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "pystray>=0.19",
+    "Pillow>=10.0",
+    "pyperclip>=1.8",
+    "pyyaml>=6.0",
+    "platformdirs>=4.0",
+]
+
+[project.optional-dependencies]
+onnx = ["onnxruntime>=1.16", "librosa>=0.10"]
+onnx-gpu = ["onnxruntime-gpu>=1.16", "librosa>=0.10"]
+nemo = ["nemo-toolkit[asr]>=1.22"]
+dev = ["pyinstaller>=6.0", "ruff>=0.1"]
+
+[project.scripts]
+uttr-win = "uttr_win.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100

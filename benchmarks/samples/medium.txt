@@ -1,0 +1,3 @@
+I've been working on the authentication module for about two weeks now.
+The OAuth 2.0 integration with Google and Microsoft is done, 
+but we still need to handle edge cases like token refresh failures and session timeouts.

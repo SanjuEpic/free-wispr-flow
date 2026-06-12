@@ -1,0 +1,8 @@
+So here's what happened during yesterday's deployment.
+ We pushed version 3.7.2 to production around 11 PM, 
+ and within 15 minutes the error rate on the payments API spiked to about 12 percent.
+Turns out the database migration for the transactions table didn't complete properly 
+because of a lock conflict with the nightly backup job. We rolled back at 11:45, 
+fixed the migration script to use concurrent index creation, and redeployed this morning.
+Everything's stable now, but I want to add a pre-deployment checklist that verifies no 
+background jobs are running before we start migrations.
