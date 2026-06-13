@@ -9,24 +9,23 @@ Local speech-to-text for Windows. Press a hotkey, speak, text appears at your cu
 | **OS** | Windows 10 (version 1903+) or Windows 11 — x64 only (ARM64 not supported) |
 | **CPU** | Any modern x64 processor (Intel/AMD). Transcription runs on CPU by default. |
 | **RAM** | 4 GB minimum, 8 GB recommended |
-| **Disk** | ~150 MB (CPU installer), ~600 MB (GPU installer) |
+| **Disk** | ~600 MB (installer) |
 | **GPU** (optional) | NVIDIA GPU with compute capability 7.0+ (GTX 1650 or newer, any RTX) and driver 525+. Not required — CPU works fine, just slower. |
 | **Audio** | Working microphone |
 
 ## Installation (Recommended)
 
-Download the installer from the [Releases](https://github.com/SanjuEpic/free-wispr-flow/releases) page:
+Download **`uttr-win-setup.exe`** from the [Releases](https://github.com/SanjuEpic/free-wispr-flow/releases) page — one universal installer for every Windows 10/11 x64 PC (~600 MB):
 
-| Installer | Who it's for | Size |
-|-----------|-------------|------|
-| `uttr-win-setup.exe` | Most users (CPU-only) | ~150 MB |
-| `uttr-win-gpu-setup.exe` | Users with an NVIDIA GPU who want faster transcription | ~600 MB |
+| Installer | Works on | Size |
+|-----------|----------|------|
+| `uttr-win-setup.exe` | Any Windows 10/11 x64 PC — uses your NVIDIA GPU automatically if present, otherwise runs on CPU | ~600 MB |
 
-**Not sure which to pick?** If you have an NVIDIA GPU (GTX 1650 or newer), go with the GPU installer — it includes automatic CPU/GPU switching. Otherwise, the CPU installer is all you need.
+It bundles CUDA, so NVIDIA GPU users get fast inference out of the box, and it **falls back to CPU automatically** on machines without an NVIDIA GPU — no separate download, nothing to configure. The installer is larger because the CUDA libraries are included; if you specifically want a smaller CPU-only build, you can build one from source (see [Building the Installer](#building-the-installer)).
 
 ### Install Steps
 
-1. Download the `.exe` installer for your variant.
+1. Download `uttr-win-setup.exe`.
 2. Run the installer — Windows SmartScreen may warn "unrecognized app". Click **More info** → **Run anyway** (the app is unsigned).
 3. Choose the Start Menu folder (default `uttr-win` is fine) and click **Next**. The default install location is `%LOCALAPPDATA%\Programs\uttr-win` (per-user, no admin needed).
 
@@ -36,7 +35,7 @@ Download the installer from the [Releases](https://github.com/SanjuEpic/free-wis
 
    ![Select additional tasks](assets/app-setup-pics/installer-setup-step2.png)
 
-5. Click **Install** and wait while files extract (the GPU variant copies CUDA DLLs, so it takes a bit longer).
+5. Click **Install** and wait while files extract (the bundled CUDA libraries make this take a bit longer).
 
    ![Installing](assets/app-setup-pics/installer-setup-step3.png)
 
@@ -112,17 +111,13 @@ Settings are stored at `%LOCALAPPDATA%/uttr-win/settings.yaml`.
 
 CUDA dramatically improves transcription speed — `small.en` drops from ~5s to ~1s on a typical NVIDIA GPU.
 
-### If you installed the GPU variant (.exe)
+### If you installed the app (.exe)
 
-GPU support is included and works out of the box. The app auto-detects your GPU and switches between CPU/GPU based on available VRAM. You can also force a specific device in Settings:
+GPU support is built in and works out of the box — no separate variant needed. The app auto-detects your hardware and switches between CPU/GPU based on available VRAM. On a machine without an NVIDIA GPU it simply runs on CPU; the installer never breaks. You can also force a specific device in Settings:
 
 - **auto** (default) — uses GPU when enough VRAM is free, otherwise falls back to CPU
 - **cpu** — always uses CPU
 - **cuda** — always uses GPU (falls back to CPU if GPU load fails)
-
-### If you installed the CPU variant (.exe)
-
-The CPU installer does not include GPU libraries. If you want GPU acceleration, download and install the GPU variant instead. Your settings will be preserved.
 
 ### If you installed from source
 
@@ -159,17 +154,17 @@ To build the installer yourself:
 ```
 pip install pyinstaller
 
-# CPU-only build
-pyinstaller uttr-win.spec
-iscc installer.iss /DCPU_ONLY
-
-# GPU build (includes CUDA DLLs)
+# Universal build (CUDA bundled, auto CPU/GPU at runtime) — this is what's published
 set UTTR_GPU=1
+pyinstaller uttr-win.spec --distpath dist-gpu --workpath build-gpu
+iscc installer.iss /DGPU_BUILD          # -> Output/uttr-win-setup.exe (~600 MB)
+
+# Optional smaller CPU-only build (no CUDA, not published)
 pyinstaller uttr-win.spec
-iscc installer.iss /DGPU_BUILD
+iscc installer.iss                      # -> Output/uttr-win-cpu-setup.exe (~96 MB)
 ```
 
-[Inno Setup](https://jrsoftware.org/issetup.php) must be installed and `iscc` on your PATH. The output installer lands in the `Output/` directory.
+[Inno Setup](https://jrsoftware.org/issetup.php) must be installed and `iscc` on your PATH (pass `/DGPU_BUILD` via PowerShell). The output installer lands in the `Output/` directory.
 
 ## Installing Optional Providers
 

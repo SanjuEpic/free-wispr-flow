@@ -1,9 +1,12 @@
+; GPU_BUILD produces the universal installer (CUDA bundled, auto CPU/GPU
+; selection at runtime — works on machines with or without an NVIDIA GPU).
+; The plain build is a smaller CPU-only installer, not currently published.
 #ifdef GPU_BUILD
 #define DistDir "dist-gpu\uttr-win"
-#define OutputName "uttr-win-gpu-setup"
+#define OutputName "uttr-win-setup"
 #else
 #define DistDir "dist\uttr-win"
-#define OutputName "uttr-win-setup"
+#define OutputName "uttr-win-cpu-setup"
 #endif
 
 [Setup]
