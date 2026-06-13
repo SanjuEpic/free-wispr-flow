@@ -11,62 +11,43 @@ resulting text into whatever window your cursor was in.
 
 ## End-to-end flow
 
-```
-                              ┌─────────────────────────────┐
-                              │           YOU               │
-                              │  (mic + the active window)  │
-                              └──────────────┬──────────────┘
-                                             │ press Ctrl+Space
-                                             ▼
-   ┌───────────────────────────────────────────────────────────────────────┐
-   │                            uttr-win (tray app)                          │
-   │                                                                         │
-   │   hotkey.py ──────────► app.py (state machine) ◄──────── sounds.py      │
-   │   listens for           IDLE→RECORDING→PROCESSING        plays pop/     │
-   │   Ctrl+Space            →IDLE                            chime/error     │
-   │       │                      │                                          │
-   │       │  toggle              │ start/stop                               │
-   │       ▼                      ▼                                          │
-   │   (1) START            audio.py                                         │
-   │       captures the     records mic to a temp .wav (16kHz mono)          │
-   │       active window    + 0.6s tail buffer so trailing words aren't cut  │
-   │       via paste.py's        │                                           │
-   │       ForegroundTracker     ▼                                           │
-   │                        transcription/ (provider abstraction)            │
-   │                        faster_whisper_provider.py                       │
-   │                        loads Whisper model on CUDA (auto-falls          │
-   │                        back to CPU), returns text                       │
-   │                             │                                           │
-   │                             ▼                                           │
-   │                        paste.py                                         │
-   │                        1. copy text to clipboard (pyperclip)            │
-   │                        2. refocus the original window                   │
-   │                        3. send Ctrl+V via Win32 SendInput               │
-   │                             │                                           │
-   │                             ├──► history.py  (saves last 10 to JSON)    │
-   │                             └──► sounds.py    (success chime)           │
-   └─────────────────────────────┬───────────────────────────────────────────┘
-                                 │ Ctrl+V
-                                 ▼
-                    ┌─────────────────────────────┐
-                    │  Your target window         │
-                    │  (Notepad, VS Code, Chrome…)│
-                    │  → transcribed text appears │
-                    └─────────────────────────────┘
+> The diagrams below are [Mermaid](https://mermaid.js.org/). GitHub renders them
+> as interactive diagrams — click one to open the viewer and **zoom / pan**.
+
+```mermaid
+flowchart TD
+    YOU(["You — mic + active window"]) -->|press Ctrl+Space| HK
+
+    subgraph APP["uttr-win tray app"]
+        HK["hotkey.py<br/>global Ctrl+Space"] --> STATE["app.py<br/>state machine"]
+        STATE -->|start recording| AUD["audio.py<br/>record 16kHz mono WAV<br/>+ 0.6s tail buffer"]
+        AUD --> TR["transcription/<br/>faster_whisper_provider.py<br/>CUDA, auto-fallback to CPU"]
+        TR --> PASTE["paste.py<br/>1. clipboard 2. refocus 3. Ctrl+V"]
+        PASTE --> HIST["history.py<br/>save last 10 to JSON"]
+        PASTE --> SND["sounds.py<br/>success chime"]
+        STATE -.->|start / stop sounds| SND
+        STATE -.->|tracks target window| PASTE
+    end
+
+    PASTE -->|Ctrl+V| TARGET(["Target window<br/>Notepad / VS Code / Chrome"])
 ```
 
 ## The state machine (app.py)
 
 The whole app is driven by four states. Each Ctrl+Space press moves it forward.
 
-```
-   IDLE ──Ctrl+Space──► RECORDING ──Ctrl+Space──► PROCESSING ──(done)──► IDLE
-    ▲                    (mic open,                (transcribe +            │
-    │                     start sound)              paste + sounds)         │
-    └──────────────────────────────────────────────────────────────────────┘
-
-   LOADING  (only at startup / after Settings reload — model is loading;
-             hotkey presses are ignored until it becomes IDLE)
+```mermaid
+stateDiagram-v2
+    [*] --> LOADING: startup
+    LOADING --> IDLE: model ready
+    IDLE --> RECORDING: Ctrl+Space (mic open, start sound)
+    RECORDING --> PROCESSING: Ctrl+Space (stop sound)
+    PROCESSING --> IDLE: transcribe + paste done
+    IDLE --> LOADING: Settings → Save & Reload
+    note right of LOADING
+        Hotkey presses are ignored
+        while the model is loading.
+    end note
 ```
 
 ## Who does what (file responsibilities)
@@ -122,15 +103,11 @@ are `Toplevel`s of it. Everything else runs off the main thread:
 
 ## Build & distribution flow
 
-```
-   src/ ──UTTR_GPU=1 pyinstaller uttr-win.spec──► dist-gpu/uttr-win/  (exe + CUDA + deps)
-                                              │
-                                installer.iss /DGPU_BUILD (Inno Setup)
-                                              │
-                                              ▼
-                                Output/uttr-win-setup.exe   (universal, ~600MB)
-                                              │
-                                    gh release upload v0.1.0
+```mermaid
+flowchart LR
+    SRC["src/"] -->|"UTTR_GPU=1 pyinstaller"| DIST["dist-gpu/uttr-win/<br/>exe + CUDA + deps"]
+    DIST -->|"installer.iss /DGPU_BUILD<br/>(Inno Setup)"| EXE["Output/uttr-win-setup.exe<br/>universal, ~600MB"]
+    EXE -->|"gh release upload"| REL(["GitHub Release v0.1.0"])
 ```
 
 A single **universal installer** is published: the GPU build (CUDA bundled) that
