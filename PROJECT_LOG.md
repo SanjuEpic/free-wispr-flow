@@ -105,6 +105,30 @@ fallback.
 - **Lesson:** when a frozen-exe feature fails with "requires package X", the fix
   is usually to bundle X, not to delete the feature.
 
+### 9. App crashed on Save & Reload; tray froze / responded late
+- **Symptom:** Pressing Save & Reload silently killed the whole app (no
+  "Shutting down" log, single-instance lock released → relaunch needed). The
+  tray icon also froze or responded late, sometimes needing a relaunch.
+- **Root cause (one cause, three symptoms):** Settings and History each created
+  their **own `Tk()` root in a background thread**. tkinter is not thread-safe;
+  running it off the main thread and creating/destroying multiple roots across
+  threads intermittently corrupts the Tcl interpreter → hard segfault, which
+  also destabilised the pystray loop (freezes).
+- **Fix (windowing refactor):**
+  - One persistent **hidden `Tk()` root on the main thread**; Settings/History
+    are now `Toplevel`s of it (no per-window `Tk()`, no per-window threads).
+  - **pystray runs in a background thread**; its menu callbacks only enqueue a
+    token onto a `queue.Queue`.
+  - The main thread polls that queue via `root.after(100, ...)` and creates the
+    windows — so all tkinter work happens on one thread.
+  - Background work (GPU probe, CUDA install) marshals UI updates with
+    `win.after(...)`, guarded by `winfo_exists()`.
+  - See `app.py` (`run`/`_poll_ui_queue`/`_show_*`/`_shutdown`),
+    `ui/settings_window.py`, `ui/history_window.py`.
+- **Verified:** open → Save (destroy + reload) → reopen → cancel, and history
+  open/refresh/clear/close all run with no crash; full app launches and stays
+  stable.
+
 ## How to build
 
 ```bash

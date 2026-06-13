@@ -1,4 +1,3 @@
-import threading
 import tkinter as tk
 from tkinter import ttk
 from datetime import datetime
@@ -10,32 +9,44 @@ log = setup_logger("uttr-win.history-ui")
 
 
 class HistoryWindow:
-    def __init__(self):
-        pass
+    """A Toplevel history window. All methods must run on the main (tkinter)
+    thread — the window is a child of the app's persistent hidden root."""
+
+    def __init__(self, parent: tk.Misc):
+        self._parent = parent
+        self._win: tk.Toplevel | None = None
 
     def open(self) -> None:
-        t = threading.Thread(target=self._run, daemon=True)
-        t.start()
-
-    def _run(self) -> None:
-        self._root = tk.Tk()
-        self._root.title("uttr-win — Transcription History")
-        self._root.resizable(False, False)
-        self._root.attributes("-topmost", True)
+        if self._win is not None and self._win.winfo_exists():
+            self._refresh()
+            self._win.lift()
+            self._win.focus_force()
+            return
+        self._win = tk.Toplevel(self._parent)
+        self._win.title("uttr-win — Transcription History")
+        self._win.resizable(False, False)
+        self._win.attributes("-topmost", True)
+        self._win.protocol("WM_DELETE_WINDOW", self._close)
         self._build_ui()
         self._center_window()
-        self._root.mainloop()
+
+    def _refresh(self) -> None:
+        """Rebuild the contents so re-opening shows the latest transcriptions."""
+        for child in self._win.winfo_children():
+            child.destroy()
+        self._build_ui()
+        self._center_window()
 
     def _center_window(self) -> None:
-        self._root.update_idletasks()
-        w = self._root.winfo_width()
-        h = self._root.winfo_height()
-        x = (self._root.winfo_screenwidth() - w) // 2
-        y = (self._root.winfo_screenheight() - h) // 2
-        self._root.geometry(f"+{x}+{y}")
+        self._win.update_idletasks()
+        w = self._win.winfo_width()
+        h = self._win.winfo_height()
+        x = (self._win.winfo_screenwidth() - w) // 2
+        y = (self._win.winfo_screenheight() - h) // 2
+        self._win.geometry(f"+{x}+{y}")
 
     def _build_ui(self) -> None:
-        root = self._root
+        root = self._win
         root.configure(padx=20, pady=15)
 
         title = ttk.Label(root, text="Transcription History", font=("Segoe UI", 14, "bold"))
@@ -62,7 +73,12 @@ class HistoryWindow:
             canvas.pack(side="left", fill="both", expand=True)
             scrollbar.pack(side="right", fill="y")
 
-            canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(-1 * (e.delta // 120), "units"))
+            # Scope the mouse-wheel binding to this canvas only (bind/unbind on
+            # hover) so it never leaks to other windows under the shared root.
+            def _on_wheel(e):
+                canvas.yview_scroll(-1 * (e.delta // 120), "units")
+            canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_wheel))
+            canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
             for i, entry in enumerate(entries):
                 frame = ttk.LabelFrame(scroll_frame, text="", padding=8)
@@ -102,17 +118,21 @@ class HistoryWindow:
         btn_frame = ttk.Frame(root)
         btn_frame.pack(fill="x")
 
-        ttk.Button(btn_frame, text="Close", command=self._root.destroy).pack(side="right")
+        ttk.Button(btn_frame, text="Close", command=self._close).pack(side="right")
         if entries:
             ttk.Button(btn_frame, text="Clear History",
                        command=self._clear_history).pack(side="left")
 
     def _copy_text(self, text: str) -> None:
-        self._root.clipboard_clear()
-        self._root.clipboard_append(text)
+        self._win.clipboard_clear()
+        self._win.clipboard_append(text)
         log.info("Copied text to clipboard (%d chars)", len(text))
 
     def _clear_history(self) -> None:
         history.clear()
-        self._root.destroy()
-        HistoryWindow().open()
+        self._refresh()
+
+    def _close(self) -> None:
+        if self._win is not None:
+            self._win.destroy()
+            self._win = None

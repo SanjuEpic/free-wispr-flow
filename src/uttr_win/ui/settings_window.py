@@ -49,33 +49,38 @@ def _set_autostart(enabled: bool) -> None:
 
 
 class SettingsWindow:
-    def __init__(self, settings, on_reload: Callable):
+    """A Toplevel settings window. All methods must run on the main (tkinter)
+    thread — the window is a child of the app's persistent hidden root."""
+
+    def __init__(self, parent: tk.Misc, settings, on_reload: Callable):
+        self._parent = parent
         self._settings = settings
         self._on_reload = on_reload
+        self._win: tk.Toplevel | None = None
 
     def open(self) -> None:
-        t = threading.Thread(target=self._run, daemon=True)
-        t.start()
-
-    def _run(self) -> None:
-        self._root = tk.Tk()
-        self._root.title("uttr-win Settings")
-        self._root.resizable(False, False)
-        self._root.attributes("-topmost", True)
+        if self._win is not None and self._win.winfo_exists():
+            self._win.lift()
+            self._win.focus_force()
+            return
+        self._win = tk.Toplevel(self._parent)
+        self._win.title("uttr-win Settings")
+        self._win.resizable(False, False)
+        self._win.attributes("-topmost", True)
+        self._win.protocol("WM_DELETE_WINDOW", self._cancel)
         self._build_ui()
         self._center_window()
-        self._root.mainloop()
 
     def _center_window(self) -> None:
-        self._root.update_idletasks()
-        w = self._root.winfo_width()
-        h = self._root.winfo_height()
-        x = (self._root.winfo_screenwidth() - w) // 2
-        y = (self._root.winfo_screenheight() - h) // 2
-        self._root.geometry(f"+{x}+{y}")
+        self._win.update_idletasks()
+        w = self._win.winfo_width()
+        h = self._win.winfo_height()
+        x = (self._win.winfo_screenwidth() - w) // 2
+        y = (self._win.winfo_screenheight() - h) // 2
+        self._win.geometry(f"+{x}+{y}")
 
     def _build_ui(self) -> None:
-        root = self._root
+        root = self._win
         root.configure(padx=20, pady=15)
 
         title = ttk.Label(root, text="uttr-win Settings", font=("Segoe UI", 14, "bold"))
@@ -150,12 +155,17 @@ class SettingsWindow:
         ttk.Button(btn_frame, text="Cancel", command=self._cancel).pack(side="right", padx=(5, 0))
         ttk.Button(btn_frame, text="Save & Reload", command=self._save).pack(side="right")
 
+    def _alive(self) -> bool:
+        return self._win is not None and self._win.winfo_exists()
+
     def _check_gpu_status(self) -> None:
         gpu = detect_gpu()
         cuda_status = check_cuda_libs()
         is_frozen = getattr(sys, "frozen", False)
 
         def update():
+            if not self._alive():
+                return
             if not gpu:
                 self._gpu_status_label.config(text="No NVIDIA GPU detected. Using CPU.")
                 return
@@ -169,7 +179,7 @@ class SettingsWindow:
                 )
             elif is_frozen:
                 self._gpu_status_label.config(
-                    text=f"{gpu_text}\nCUDA not included in this build. Download the GPU installer variant for GPU acceleration.",
+                    text=f"{gpu_text}\nCUDA not available in this runtime. Auto mode will use CPU.",
                     foreground="orange",
                 )
             else:
@@ -179,7 +189,8 @@ class SettingsWindow:
                 )
                 self._gpu_action_btn.pack(anchor="w", pady=(5, 0))
 
-        self._root.after(0, update)
+        if self._alive():
+            self._win.after(0, update)
 
     def _install_gpu(self) -> None:
         self._gpu_action_btn.config(state="disabled", text="Installing...")
@@ -187,11 +198,14 @@ class SettingsWindow:
 
         def do_install():
             def progress(msg):
-                self._root.after(0, lambda: self._gpu_progress_label.config(text=msg))
+                if self._alive():
+                    self._win.after(0, lambda: self._gpu_progress_label.config(text=msg))
 
             success = install_cuda_packages(progress_callback=progress)
 
             def done():
+                if not self._alive():
+                    return
                 if success:
                     self._gpu_status_label.config(
                         text="GPU support installed! Save & Reload to activate.",
@@ -202,12 +216,13 @@ class SettingsWindow:
                         "GPU Setup Complete",
                         "CUDA libraries installed successfully.\n\n"
                         "Click 'Save & Reload' to start using GPU acceleration.",
-                        parent=self._root,
+                        parent=self._win,
                     )
                 else:
                     self._gpu_action_btn.config(state="normal", text="Retry Install")
 
-            self._root.after(0, done)
+            if self._alive():
+                self._win.after(0, done)
 
         threading.Thread(target=do_install, daemon=True).start()
 
@@ -223,8 +238,13 @@ class SettingsWindow:
                  self._device_var.get(), self._model_var.get(), self._compute_var.get(),
                  self._sounds_var.get(), self._autostart_var.get())
 
-        self._root.destroy()
+        self._close()
         self._on_reload()
 
     def _cancel(self) -> None:
-        self._root.destroy()
+        self._close()
+
+    def _close(self) -> None:
+        if self._win is not None:
+            self._win.destroy()
+            self._win = None

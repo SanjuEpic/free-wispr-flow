@@ -2,8 +2,10 @@ import argparse
 import os
 import sys
 import enum
+import queue
 import threading
 import ctypes
+import tkinter as tk
 from pathlib import Path
 
 from PIL import Image
@@ -64,7 +66,10 @@ class App:
         self._model_size_override = model_size
         self._fg_tracker = ForegroundTracker()
         self._target_hwnd: int = 0
+        self._root: tk.Tk | None = None
+        self._ui_queue: "queue.Queue[str]" = queue.Queue()
         self._settings_window: SettingsWindow | None = None
+        self._history_window: HistoryWindow | None = None
 
     def run(self) -> None:
         log.info("uttr-win starting")
@@ -86,18 +91,28 @@ class App:
                 enabled=False,
             ),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("History", self._open_history),
-            pystray.MenuItem("Settings", self._open_settings),
-            pystray.MenuItem("Quit", self._quit),
+            pystray.MenuItem("History", self._request_history),
+            pystray.MenuItem("Settings", self._request_settings),
+            pystray.MenuItem("Quit", self._request_quit),
         )
         self._icon = pystray.Icon("uttr-win", image, "uttr-win", menu)
+
+        # tkinter is not thread-safe: run it on the main thread with a single
+        # persistent hidden root. All windows are Toplevels of this root.
+        self._root = tk.Tk()
+        self._root.withdraw()
 
         with self._lock:
             self._state = AppState.LOADING
         threading.Thread(target=self._load_provider, daemon=True).start()
 
+        # The tray runs in its own thread; its menu callbacks (which run on that
+        # thread) marshal UI work back to the main thread via a queue we poll.
+        threading.Thread(target=self._icon.run, daemon=True).start()
         log.info("Tray icon ready — Ctrl+Space to toggle recording")
-        self._icon.run()
+
+        self._root.after(100, self._poll_ui_queue)
+        self._root.mainloop()
 
     def _load_icon(self) -> Image.Image:
         if ICON_PATH.exists():
@@ -215,12 +230,44 @@ class App:
             except OSError:
                 pass
 
-    def _open_history(self, icon: pystray.Icon, item) -> None:
-        HistoryWindow().open()
+    # --- Tray callbacks (run on the pystray thread): enqueue UI work only ---
+    def _request_history(self, icon: pystray.Icon, item) -> None:
+        self._ui_queue.put("history")
 
-    def _open_settings(self, icon: pystray.Icon, item) -> None:
-        self._settings_window = SettingsWindow(self._settings, on_reload=self._reload_provider)
+    def _request_settings(self, icon: pystray.Icon, item) -> None:
+        self._ui_queue.put("settings")
+
+    def _request_quit(self, icon: pystray.Icon, item) -> None:
+        self._ui_queue.put("quit")
+
+    # --- UI queue pump (runs on the main/tkinter thread) ---
+    def _poll_ui_queue(self) -> None:
+        try:
+            while True:
+                req = self._ui_queue.get_nowait()
+                if req == "settings":
+                    self._show_settings()
+                elif req == "history":
+                    self._show_history()
+                elif req == "quit":
+                    self._shutdown()
+                    return
+        except queue.Empty:
+            pass
+        if self._root is not None:
+            self._root.after(100, self._poll_ui_queue)
+
+    def _show_settings(self) -> None:
+        if self._settings_window is None:
+            self._settings_window = SettingsWindow(
+                self._root, self._settings, on_reload=self._reload_provider
+            )
         self._settings_window.open()
+
+    def _show_history(self) -> None:
+        if self._history_window is None:
+            self._history_window = HistoryWindow(self._root)
+        self._history_window.open()
 
     def _reload_provider(self) -> None:
         with self._lock:
@@ -233,13 +280,22 @@ class App:
         self._update_tray()
         threading.Thread(target=self._load_provider, daemon=True).start()
 
-    def _quit(self, icon: pystray.Icon, item) -> None:
+    def _shutdown(self) -> None:
+        """Runs on the main thread: tear down tray + tkinter cleanly."""
         log.info("Shutting down")
         self._fg_tracker.stop()
         self._hotkey.shutdown()
         if self._recorder.is_recording:
             self._recorder.stop()
-        icon.stop()
+        try:
+            if self._icon:
+                self._icon.stop()
+        except Exception:
+            pass
+        if self._root is not None:
+            self._root.quit()
+            self._root.destroy()
+            self._root = None
 
 
 def main():
