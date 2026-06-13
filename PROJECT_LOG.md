@@ -10,19 +10,35 @@ again — transcribed text pastes at your cursor. Runs offline using
 faster-whisper (`small.en` by default), GPU-accelerated with automatic CPU
 fallback.
 
-## Current status (as of last session)
+## Current status
+
+**Shipped as v0.1.0** — published on GitHub Releases, user-tested on a real
+machine (hotkey, transcription, paste, sounds, history, settings, and tray
+responsiveness all confirmed working).
 
 | Area | Status |
 |------|--------|
 | Hotkey (Ctrl+Space) | ✅ Working — start/stop recording |
 | Audio capture | ✅ Working — 16kHz mono + 0.6s tail buffer |
-| Transcription (CUDA) | ✅ Working in dev; fixed for installed exe |
+| Transcription (CUDA + CPU) | ✅ Working in dev and installed exe; auto CPU fallback |
 | Paste-at-cursor | ✅ Working — clipboard + refocus + Ctrl+V |
-| Sounds | ✅ Replaced robotic tones with soft pops/chimes |
+| Sounds | ✅ Soft pops/chimes (robotic tones replaced) |
 | Settings window | ✅ Working — device, model, sounds, autostart |
 | History window | ✅ Working — last 10 transcriptions, copy buttons |
 | Launch notification | ✅ Windows toast on ready |
-| CPU + GPU installers | ✅ Building (`Output\uttr-win-setup.exe`, `...-gpu-setup.exe`) |
+| Tray + window responsiveness | ✅ Fixed — main-thread tkinter refactor (bug #9) |
+| Installer | ✅ Single universal `uttr-win-setup.exe` on Releases (CUDA + CPU fallback) |
+
+## Release
+
+- **v0.1.0** — single universal installer `uttr-win-setup.exe` (~600 MB) on the
+  [Releases](https://github.com/SanjuEpic/free-wispr-flow/releases) page.
+- Built from the **GPU bundle** (`UTTR_GPU=1`): bundles CUDA so NVIDIA users get
+  fast inference, and falls back to CPU automatically on machines without a GPU.
+- Releases are **manual** (no auto-build CI): rebuild locally, test, then
+  `gh release upload`. A tag-triggered build was considered and deliberately
+  skipped — a headless runner can't smoke-test the exe (no mic/GPU/display) and
+  would happily publish broken builds.
 
 ## Key decisions
 
@@ -36,8 +52,14 @@ fallback.
   small.en (recommended)` so beginners don't pick huge slow models.
 - **Distribution = PyInstaller folder bundle + Inno Setup**, not single-file
   exe (single-file extracts to temp on every launch — slow, AV-flagged).
-- **Two installer variants.** CPU (~97MB) and GPU (~590MB, bundles only the 6
-  CUDA DLLs ctranslate2 actually loads — not the full cuDNN package).
+- **One universal installer, not two.** Originally built separate CPU (~97MB)
+  and GPU (~600MB) variants, but the CPU exe didn't run on the test machine and
+  the GPU exe already falls back to CPU cleanly (triple-guarded: exception-safe
+  CUDA check → `nvidia-smi` absence → load-failure fallback). So
+  we publish a single `uttr-win-setup.exe` (the GPU build) and drop the CPU
+  variant from Releases. The CPU build still exists (`installer.iss` plain
+  target → `uttr-win-cpu-setup.exe`) but is unpublished. The GPU bundle includes
+  only the 6 CUDA DLLs ctranslate2 actually loads — not the full cuDNN package.
 
 ## Bugs found & fixed
 
@@ -129,25 +151,55 @@ fallback.
   open/refresh/clear/close all run with no crash; full app launches and stays
   stable.
 
+## Verified facts
+
+### Performance & quantization (measured)
+`compute_type="auto"` → **`float16` on GPU, `int8` on CPU** (set in
+`faster_whisper_provider.py`).
+
+| | Quantization | Typical 5–8s utterance | Notes |
+|---|---|---|---|
+| **GPU** | float16 | **~1.3s** | recommended path |
+| **CPU** | int8 | **~3.6–3.9s** | ~3–5× slower; grows with clip length |
+
+Quality A/B on the same clip: **GPU (float16) was *more* accurate** ("token
+refresh failures") than CPU (int8, heard "figures"). `int8` is lower precision
+than `float16`, so a perceived "CPU is better" is run-to-run variance, not real.
+
+### Offline claim (verified)
+The installed exe genuinely runs **fully offline after the one-time model
+download**. Our code makes zero network calls; the frozen exe loads the model
+from a local directory path (faster-whisper skips HuggingFace when given a
+directory), and VAD runs from the bundled `silero_vad_v6.onnx`. Proven by
+loading + transcribing with `HF_HUB_OFFLINE=1`. (Running *from source* passes a
+model *name*, so it does a HuggingFace freshness check at startup — does not
+affect the shipped exe.)
+
 ## How to build
 
 ```bash
 # From repo root, with `pip install -e .` done and PyInstaller + Inno Setup installed.
 
-# CPU variant
-python -m PyInstaller uttr-win.spec --noconfirm
-"$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" installer.iss
-#   → Output/uttr-win-setup.exe   (~97MB)
-
-# GPU variant
+# Universal build (PUBLISHED) — CUDA bundled, auto CPU/GPU at runtime
 UTTR_GPU=1 python -m PyInstaller uttr-win.spec --noconfirm --distpath dist-gpu --workpath build-gpu
 ISCC.exe /DGPU_BUILD installer.iss        # run via PowerShell for the /D flag
-#   → Output/uttr-win-gpu-setup.exe   (~590MB)
+#   → Output/uttr-win-setup.exe   (~600MB)
+
+# Optional CPU-only build (NOT published)
+python -m PyInstaller uttr-win.spec --noconfirm
+"$LOCALAPPDATA/Programs/Inno Setup 6/ISCC.exe" installer.iss
+#   → Output/uttr-win-cpu-setup.exe   (~97MB)
 ```
 
-Note: the `/DGPU_BUILD` flag must be passed via PowerShell
-(`& "...\ISCC.exe" /DGPU_BUILD installer.iss`); the Git-Bash invocation mangles
-it into "more than one script filename".
+Notes:
+- The `/DGPU_BUILD` flag must be passed via PowerShell
+  (`& "...\ISCC.exe" /DGPU_BUILD installer.iss`); the Git-Bash invocation mangles
+  it into "more than one script filename".
+- `installer.iss` `OutputName`: GPU build → `uttr-win-setup`, plain build →
+  `uttr-win-cpu-setup`.
+- To publish: `gh release upload v0.1.0 Output/uttr-win-setup.exe` (delete the
+  old asset first; release-asset names can also be renamed via the GitHub API
+  without re-uploading).
 
 ## How to test (dev, no rebuild)
 
@@ -173,9 +225,15 @@ python -m uttr_win.app
 - **Launch notification** is a Windows toast; if Focus Assist / notifications
   are muted you won't see "Ready! Press Ctrl+Space to start recording."
 - **First exe launch** may pause to create the flat model copy (one-time).
+- **Device is a saved setting.** If transcription runs on CPU when a GPU exists,
+  check Settings → Device — it may be pinned to `cpu`. Set it to `auto` (or
+  `cuda`) for the GPU path.
 
 ## Open / possible follow-ups
 
+- **CPU-only installer doesn't run** on the test machine (undiagnosed). Not a
+  problem for users since we ship the universal/GPU build, but the root cause
+  (likely a missing runtime DLL the GPU build happens to include) is unfixed.
 - Terminal flash on very first launch after install (minor, cosmetic).
 - Making the hotkey user-configurable (currently hardcoded).
 - Wiring up the Parakeet providers (currently stubs).
