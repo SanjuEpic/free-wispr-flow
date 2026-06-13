@@ -2,6 +2,19 @@
 
 Local speech-to-text for Windows. Press a hotkey, speak, text appears at your cursor. No cloud, no subscription.
 
+## How it works
+
+```mermaid
+flowchart LR
+    A(["Press Ctrl+Space"]) --> B["🎙️ Speak"]
+    B --> C(["Press Ctrl+Space again"])
+    C --> D["Transcribe locally<br/>faster-whisper, GPU or CPU"]
+    D --> E["📋 Text pasted at your cursor<br/>in any app"]
+```
+
+> This diagram is [Mermaid](https://mermaid.js.org/) — on GitHub you can click it
+> to zoom and pan. Deeper internals are in [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## System Requirements
 
 | Requirement | Details |
