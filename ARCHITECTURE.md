@@ -16,20 +16,20 @@ resulting text into whatever window your cursor was in.
 
 ```mermaid
 flowchart TD
-    YOU(["You — mic + active window"]) -->|press Ctrl+Space| HK
+    YOU["You: mic and active window"] -->|press Ctrl+Space| HK
 
     subgraph APP["uttr-win tray app"]
-        HK["hotkey.py<br/>global Ctrl+Space"] --> STATE["app.py<br/>state machine"]
-        STATE -->|start recording| AUD["audio.py<br/>record 16kHz mono WAV<br/>+ 0.6s tail buffer"]
-        AUD --> TR["transcription/<br/>faster_whisper_provider.py<br/>CUDA, auto-fallback to CPU"]
-        TR --> PASTE["paste.py<br/>1. clipboard 2. refocus 3. Ctrl+V"]
-        PASTE --> HIST["history.py<br/>save last 10 to JSON"]
-        PASTE --> SND["sounds.py<br/>success chime"]
-        STATE -.->|start / stop sounds| SND
+        HK["hotkey.py<br>global Ctrl+Space"] --> STATE["app.py<br>state machine"]
+        STATE -->|start recording| AUD["audio.py<br>record 16kHz mono WAV<br>plus 0.6s tail buffer"]
+        AUD --> TR["transcription<br>faster_whisper_provider.py<br>CUDA, auto-fallback to CPU"]
+        TR --> PASTE["paste.py<br>clipboard, refocus, Ctrl+V"]
+        PASTE --> HIST["history.py<br>save last 10 to JSON"]
+        PASTE --> SND["sounds.py<br>success chime"]
+        STATE -.->|start and stop sounds| SND
         STATE -.->|tracks target window| PASTE
     end
 
-    PASTE -->|Ctrl+V| TARGET(["Target window<br/>Notepad / VS Code / Chrome"])
+    PASTE -->|Ctrl+V| TARGET["Target window<br>Notepad, VS Code, Chrome"]
 ```
 
 ## The state machine (app.py)
@@ -40,10 +40,10 @@ The whole app is driven by four states. Each Ctrl+Space press moves it forward.
 stateDiagram-v2
     [*] --> LOADING: startup
     LOADING --> IDLE: model ready
-    IDLE --> RECORDING: Ctrl+Space (mic open, start sound)
-    RECORDING --> PROCESSING: Ctrl+Space (stop sound)
-    PROCESSING --> IDLE: transcribe + paste done
-    IDLE --> LOADING: Settings → Save & Reload
+    IDLE --> RECORDING: Ctrl+Space, mic open, start sound
+    RECORDING --> PROCESSING: Ctrl+Space, stop sound
+    PROCESSING --> IDLE: transcribe and paste done
+    IDLE --> LOADING: Settings, Save and Reload
     note right of LOADING
         Hotkey presses are ignored
         while the model is loading.
@@ -105,9 +105,9 @@ are `Toplevel`s of it. Everything else runs off the main thread:
 
 ```mermaid
 flowchart LR
-    SRC["src/"] -->|"UTTR_GPU=1 pyinstaller"| DIST["dist-gpu/uttr-win/<br/>exe + CUDA + deps"]
-    DIST -->|"installer.iss /DGPU_BUILD<br/>(Inno Setup)"| EXE["Output/uttr-win-setup.exe<br/>universal, ~600MB"]
-    EXE -->|"gh release upload"| REL(["GitHub Release v0.1.0"])
+    SRC["src/"] -->|UTTR_GPU=1 pyinstaller| DIST["dist-gpu/uttr-win<br>exe plus CUDA plus deps"]
+    DIST -->|installer.iss DGPU_BUILD, Inno Setup| EXE["Output/uttr-win-setup.exe<br>universal, ~600MB"]
+    EXE -->|gh release upload| REL["GitHub Release v0.1.0"]
 ```
 
 A single **universal installer** is published: the GPU build (CUDA bundled) that

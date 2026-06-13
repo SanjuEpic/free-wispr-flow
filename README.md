@@ -6,10 +6,10 @@ Local speech-to-text for Windows. Press a hotkey, speak, text appears at your cu
 
 ```mermaid
 flowchart LR
-    A(["Press Ctrl+Space"]) --> B["🎙️ Speak"]
-    B --> C(["Press Ctrl+Space again"])
-    C --> D["Transcribe locally<br/>faster-whisper, GPU or CPU"]
-    D --> E["📋 Text pasted at your cursor<br/>in any app"]
+    A["Press Ctrl+Space"] --> B["Speak"]
+    B --> C["Press Ctrl+Space again"]
+    C --> D["Transcribe locally<br>faster-whisper, GPU or CPU"]
+    D --> E["Text pasted at your cursor"]
 ```
 
 > This diagram is [Mermaid](https://mermaid.js.org/) — on GitHub you can click it
