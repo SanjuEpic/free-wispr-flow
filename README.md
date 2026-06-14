@@ -122,7 +122,7 @@ Settings are stored at `%LOCALAPPDATA%/uttr-win/settings.yaml`.
 
 ## GPU Acceleration (NVIDIA CUDA)
 
-CUDA dramatically improves transcription speed — `small.en` drops from ~5s to ~1s on a typical NVIDIA GPU.
+CUDA dramatically improves transcription speed — `small.en` drops from ~5s to ~2s on a typical NVIDIA GPU.
 
 ### If you installed the app (.exe)
 
@@ -158,7 +158,7 @@ Tested with `small.en` on a 15-second audio clip:
 | Device | Compute Type | Latency |
 |--------|-------------|---------|
 | CPU (12-core) | int8 | ~5-7s |
-| RTX 3050 4GB | float16 | ~1s |
+| RTX 3050 4GB | float16 | ~2s |
 
 ## Building the Installer
 
