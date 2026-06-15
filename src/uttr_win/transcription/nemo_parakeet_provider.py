@@ -21,6 +21,20 @@ class NemoParakeetProvider(TranscriptionProvider):
     def is_ready(self) -> bool:
         return self._model is not None
 
+    def unload(self) -> None:
+        if self._model is None:
+            return
+        import gc
+        self._model = None
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+        log.info("NeMo model unloaded")
+
     def prepare(self) -> None:
         try:
             import nemo.collections.asr as nemo_asr

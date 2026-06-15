@@ -90,6 +90,15 @@ class OnnxParakeetProvider(TranscriptionProvider):
     def is_ready(self) -> bool:
         return self._ready
 
+    def unload(self) -> None:
+        if self._session is None:
+            return
+        import gc
+        self._session = None
+        self._ready = False
+        gc.collect()
+        log.info("ONNX session unloaded")
+
     def prepare(self) -> None:
         try:
             import onnxruntime as ort
