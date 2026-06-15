@@ -55,10 +55,10 @@ stateDiagram-v2
 | File | Responsibility |
 |------|----------------|
 | `launcher.py` | PyInstaller entry point. Just calls `uttr_win.app.main()`. Exists because PyInstaller can't run a module with relative imports directly. |
-| `app.py` | **The brain.** Owns the tray icon + menu (History/Settings/Quit), the IDLE→RECORDING→PROCESSING state machine, the main-thread tkinter root, and the UI queue that marshals tray clicks onto the main thread. Wires every other module together. |
+| `app.py` | **The brain.** Owns the tray icon + menu (History/Settings/Unload/Quit), the IDLE→RECORDING→PROCESSING state machine, the main-thread tkinter root, and the UI queue that marshals tray clicks onto the main thread. Wires every other module together. |
 | `hotkey.py` | Registers the global **Ctrl+Space** hotkey via Win32 `RegisterHotKey` and fires a callback on each press. |
 | `audio.py` | Opens the mic (`sounddevice`), buffers frames, writes a temp 16kHz mono WAV. Adds a 0.6s tail so the last word isn't clipped. |
-| `transcription/base.py` | Abstract `TranscriptionProvider` — the contract every backend implements (`prepare`, `transcribe`, `name`, `is_ready`). |
+| `transcription/base.py` | Abstract `TranscriptionProvider` — the contract every backend implements (`prepare`, `transcribe`, `name`, `is_ready`, `unload`). |
 | `transcription/factory.py` | Picks a provider by id from settings (`faster-whisper` default). |
 | `transcription/faster_whisper_provider.py` | The real STT engine. Auto-detects CUDA vs CPU by free VRAM, loads the Whisper model, transcribes the WAV. Handles the frozen-exe symlink workaround (see PROJECT_LOG). |
 | `transcription/onnx_parakeet_provider.py`, `nemo_parakeet_provider.py` | Alternative backends (stubs / not default). |
