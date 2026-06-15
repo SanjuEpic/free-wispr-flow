@@ -18,3 +18,9 @@ class TranscriptionProvider(ABC):
     @property
     def is_ready(self) -> bool:
         return True
+
+    def unload(self) -> None:
+        """Free the loaded model (e.g. release GPU VRAM). Reloadable via prepare().
+
+        Default no-op; providers that hold a model should override.
+        """

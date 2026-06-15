@@ -4,6 +4,7 @@ import sys
 import enum
 import queue
 import threading
+import time
 import ctypes
 import tkinter as tk
 from pathlib import Path
@@ -28,6 +29,7 @@ if getattr(sys, "frozen", False):
 else:
     ICON_PATH = Path(__file__).resolve().parent.parent.parent / "assets" / "logo.png"
 PROCESSING_TIMEOUT_S = 120
+RELOAD_WAIT_TIMEOUT_S = 30
 
 MODEL_CHOICES = {
     "1": "faster-whisper",
@@ -70,6 +72,8 @@ class App:
         self._ui_queue: "queue.Queue[str]" = queue.Queue()
         self._settings_window: SettingsWindow | None = None
         self._history_window: HistoryWindow | None = None
+        self._model_unloaded = False
+        self._reload_lock = threading.Lock()
 
     def run(self) -> None:
         log.info("uttr-win starting")
@@ -93,6 +97,13 @@ class App:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("History", self._request_history),
             pystray.MenuItem("Settings", self._request_settings),
+            pystray.MenuItem(
+                lambda _: "Model unloaded — reloads on next Ctrl+Space"
+                if self._model_unloaded
+                else "Unload model (free GPU memory)",
+                self._request_unload,
+                enabled=lambda _: not self._model_unloaded,
+            ),
             pystray.MenuItem("Quit", self._request_quit),
         )
         self._icon = pystray.Icon("uttr-win", image, "uttr-win", menu)
@@ -143,6 +154,7 @@ class App:
             log.error("Failed to load provider: %s", e)
             self._provider = None
         finally:
+            self._model_unloaded = False
             with self._lock:
                 if self._state == AppState.LOADING:
                     self._state = AppState.IDLE
@@ -159,6 +171,11 @@ class App:
     def _on_toggle(self) -> None:
         with self._lock:
             if self._state == AppState.IDLE:
+                if self._model_unloaded:
+                    # Recording needs no model; reload it concurrently so it's
+                    # ready by the time the user stops speaking.
+                    self._model_unloaded = False
+                    threading.Thread(target=self._ensure_model_loaded, daemon=True).start()
                 self._target_hwnd = self._fg_tracker.last_hwnd
                 self._state = AppState.RECORDING
                 self._recorder.start()
@@ -209,6 +226,17 @@ class App:
                 sounds.play("error", self._settings.get("sounds_enabled", True))
                 return
 
+            if not self._provider.is_ready:
+                log.info("Waiting for model reload before transcribing...")
+                waited = 0.0
+                while not self._provider.is_ready and waited < RELOAD_WAIT_TIMEOUT_S:
+                    time.sleep(0.1)
+                    waited += 0.1
+                if not self._provider.is_ready:
+                    log.error("Model reload did not finish within %ds", RELOAD_WAIT_TIMEOUT_S)
+                    sounds.play("error", self._settings.get("sounds_enabled", True))
+                    return
+
             text = self._provider.transcribe(audio_path)
             if text.strip():
                 paste_text(text.strip(), target_hwnd=target_hwnd)
@@ -237,6 +265,9 @@ class App:
     def _request_settings(self, icon: pystray.Icon, item) -> None:
         self._ui_queue.put("settings")
 
+    def _request_unload(self, icon: pystray.Icon, item) -> None:
+        self._ui_queue.put("unload")
+
     def _request_quit(self, icon: pystray.Icon, item) -> None:
         self._ui_queue.put("quit")
 
@@ -249,6 +280,8 @@ class App:
                     self._show_settings()
                 elif req == "history":
                     self._show_history()
+                elif req == "unload":
+                    self._unload_model()
                 elif req == "quit":
                     self._shutdown()
                     return
@@ -279,6 +312,37 @@ class App:
         self._model_size_override = None
         self._update_tray()
         threading.Thread(target=self._load_provider, daemon=True).start()
+
+    def _unload_model(self) -> None:
+        """Free the model from GPU/RAM on user request. Reloads on next toggle."""
+        with self._lock:
+            if self._state != AppState.IDLE:
+                log.info("Cannot unload while %s", self._state.value)
+                return
+            if self._model_unloaded or self._provider is None:
+                return
+        self._provider.unload()
+        self._model_unloaded = True
+        self._update_tray()
+        if self._icon:
+            try:
+                self._icon.notify(
+                    "Model unloaded. Press Ctrl+Space to reload and dictate.",
+                    "uttr-win",
+                )
+            except Exception:
+                pass
+
+    def _ensure_model_loaded(self) -> None:
+        """Reload the model if it was unloaded. Serialized via _reload_lock."""
+        with self._reload_lock:
+            if not self._provider or self._provider.is_ready:
+                return
+            try:
+                self._provider.prepare()
+                log.info("Model reloaded after unload")
+            except Exception as e:
+                log.error("Model reload failed: %s", e)
 
     def _shutdown(self) -> None:
         """Runs on the main thread: tear down tray + tkinter cleanly."""

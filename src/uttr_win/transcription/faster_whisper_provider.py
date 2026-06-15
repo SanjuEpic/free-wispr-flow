@@ -169,6 +169,26 @@ class FasterWhisperProvider(TranscriptionProvider):
                 raise
         log.info("Model loaded on %s", self._resolved_device)
 
+    def unload(self) -> None:
+        """Drop the model so CUDA/ctranslate2 can release its VRAM.
+
+        ctranslate2 has no explicit free() — releasing the last reference and
+        forcing a GC pass is what lets the allocator hand memory back. A small
+        allocator cache may remain resident, so VRAM may not drop all the way
+        to zero. prepare() reloads it on demand.
+        """
+        if self._model is None:
+            return
+        import gc
+        before = get_free_vram_mb()
+        self._model = None
+        gc.collect()
+        after = get_free_vram_mb()
+        if before is not None and after is not None:
+            log.info("Model unloaded — free VRAM %dMB -> %dMB", before, after)
+        else:
+            log.info("Model unloaded")
+
     def transcribe(self, audio_path: str) -> str:
         if not self._model:
             raise RuntimeError("Model not loaded — call prepare() first")

@@ -102,7 +102,8 @@ Available `-size` options: `tiny.en`, `base.en`, `small.en`, `medium.en`, `disti
 4. Transcribed text is pasted at your cursor position in any app
 5. Right-click the tray icon → **History** to view and copy recent transcriptions
 6. Right-click the tray icon → **Settings** to configure model, device, sounds, etc.
-7. Right-click the tray icon → **Quit** to exit
+7. Right-click the tray icon → **Unload model (free GPU memory)** to release the model from VRAM when you need the GPU for something else — it reloads automatically on your next **Ctrl+Space**
+8. Right-click the tray icon → **Quit** to exit
 
 ## Settings
 
