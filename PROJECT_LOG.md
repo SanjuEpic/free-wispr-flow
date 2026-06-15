@@ -12,9 +12,10 @@ fallback.
 
 ## Current status
 
-**Shipped as v0.1.0** — published on GitHub Releases, user-tested on a real
+**Shipped as v0.1.1** — published on GitHub Releases, user-tested on a real
 machine (hotkey, transcription, paste, sounds, history, settings, and tray
-responsiveness all confirmed working).
+responsiveness all confirmed working). v0.1.1 adds an on-demand "Unload model"
+tray action.
 
 | Area | Status |
 |------|--------|
@@ -28,9 +29,12 @@ responsiveness all confirmed working).
 | Launch notification | ✅ Windows toast on ready |
 | Tray + window responsiveness | ✅ Fixed — main-thread tkinter refactor (bug #9) |
 | Installer | ✅ Single universal `uttr-win-setup.exe` on Releases (CUDA + CPU fallback) |
+| Unload model (free VRAM) | ✅ Tray action; lazy-reloads on next Ctrl+Space (v0.1.1) |
 
 ## Release
 
+- **v0.1.1** — adds the "Unload model" tray action (see Features below).
+  Rebuilt universal installer `uttr-win-setup.exe` (~600 MB).
 - **v0.1.0** — single universal installer `uttr-win-setup.exe` (~600 MB) on the
   [Releases](https://github.com/SanjuEpic/free-wispr-flow/releases) page.
 - Built from the **GPU bundle** (`UTTR_GPU=1`): bundles CUDA so NVIDIA users get
@@ -150,6 +154,34 @@ responsiveness all confirmed working).
 - **Verified:** open → Save (destroy + reload) → reopen → cancel, and history
   open/refresh/clear/close all run with no crash; full app launches and stays
   stable.
+
+## Features added post-0.1.0
+
+### Unload model (free GPU VRAM on demand) — v0.1.1
+- **Why:** the model stays resident in VRAM for the whole session (deliberate —
+  keeps each transcription ~1s instead of paying the load cost every press). But
+  that ~600MB sits in VRAM even when idle, unavailable to games/other GPU work.
+- **What:** a tray menu item **"Unload model (free GPU memory)"** drops the
+  loaded model. It lazily reloads on the next **Ctrl+Space** — recording starts
+  immediately while the reload runs concurrently in a background thread, and
+  `_transcribe` waits (up to `RELOAD_WAIT_TIMEOUT_S = 30`) for it to finish, so
+  the reload is invisible unless you stop talking faster than it loads.
+- **How VRAM is actually freed:** CPython refcounting — dropping `self._model`
+  triggers ctranslate2's native destructor + `cudaFree`. `gc.collect()` is cheap
+  insurance for the cycle case, not the mechanism. **nvidia-smi cannot free
+  another process's memory** (it's read-only monitoring); there is no CLI to free
+  a specific allocation.
+- **Caveat (measured):** VRAM does **not** drop to zero. The CUDA *context* stays
+  resident while the process lives. Smoke test on RTX 3050: free VRAM
+  3400→2853MB on load, back to **3315MB** after unload — reclaimed ~462MB of
+  ~547MB, leaving ~85MB context overhead until Quit.
+- **Scope:** `unload()` added to the `TranscriptionProvider` ABC (default no-op),
+  with real implementations in faster-whisper **and** the NeMo/ONNX stubs (they
+  hold GPU models too, so the no-op would have been a dishonest "unloaded").
+- Verified by `benchmarks/smoke_unload.py` (load → transcribe → unload → reload →
+  transcribe, identical output). See `app.py`
+  (`_unload_model`/`_ensure_model_loaded`, the `_on_toggle` reload kick, and the
+  reload wait in `_transcribe`).
 
 ## Verified facts
 
