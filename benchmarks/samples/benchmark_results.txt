@@ -1,119 +1,37 @@
 
 ================================================================================
-BENCHMARK RESULTS — CPU (int8, 12-core, 8 threads)
+BENCHMARK RESULTS
 ================================================================================
 Model                            Load  Avg Lat  Avg WER   Short    Med   Long
 --------------------------------------------------------------------------------
-faster-whisper (tiny.en)         3.9s    2.53s      38%     25%    32%    57%
-faster-whisper (base.en)         1.3s    2.92s      29%     31%    22%    33%
-faster-whisper (small.en)        3.1s    7.34s      20%     25%    11%    24%
-faster-whisper (medium.en)       8.3s   19.18s      21%     25%    14%    23%
-faster-whisper (distil-medium.en)   4.3s   12.03s      26%     25%    24%    29%
-faster-whisper (distil-large-v3)   8.4s   21.46s      20%     25%    14%    20%
-faster-whisper (large-v3-turbo)   8.5s   21.11s      19%     25%    14%    18%
-
-================================================================================
-BENCHMARK RESULTS — GPU (RTX 3050 4GB, float16, CUDA)
-================================================================================
-Model                            Load  Avg Lat  Avg WER   Short    Med   Long
---------------------------------------------------------------------------------
-faster-whisper (small.en)        7.8s    2.21s      18%     25%    11%    19%
+faster-whisper (small.en, beam=3)   2.2s    0.96s      17%     25%     8%    19%
+faster-whisper (small.en, beam=3, batched)   1.1s    0.55s      22%     25%    14%    27%
 
 Lower WER = better accuracy. Lower latency = faster.
-Sweet spot: small.en on CUDA — 2.2s avg latency, 18% WER.
+Sweet spot: best WER with acceptable latency for your use case.
 
 ================================================================================
-FULL TRANSCRIPTION OUTPUTS — CPU
+FULL TRANSCRIPTION OUTPUTS
 ================================================================================
 
---- faster-whisper (tiny.en) ---
+--- faster-whisper (small.en, beam=3) ---
 
-  [long] 3.90s (WER: 57%)
-  So, here is what happened during yesterday's deployment, the first two options we find 7.2 to production around 11 p.m. And within 15 minutes the error rate on the payments API is 5 to about 12 percent. Turns out the data based migration with the transaction stable and complete property because of a lot of benefit with the nightly backup job. roll back at all but if I fix it, make ratio script to use content index creation and read it prior to this morning. Everything stable now but I want to add up read it parametric list that verifies, you know, background, job, running. Before we start migrations
-
-  [medium] 2.98s (WER: 32%)
-  I have to be working on the authentication model for about 2 weeks now, the raw 2.0 integration with Google and Microsoft is done, but we still need to handle HKSS like token refresh you use and session timeouts.
-
-  [short] 0.70s (WER: 25%)
-  Hey, can you schedule a meeting with Brea and John for the next Thursday at 3.30 p.m.?
-
---- faster-whisper (base.en) ---
-
-  [long] 5.03s (WER: 33%)
-  So, here is what happened during yesterday's deployment, we close to our 7.2 to production around 11 PM and within 15 minutes the error rate on the payments API spiked to about 12 percent. Turns out the database migration for the transaction stable didn't complete properly because of off conflict with a nightly backup job. We roll back at down 45 pixel migration script to use concurrent index creation and we require this morning. Everything is stable now but I want to add a a pre-depriment checklist that verifies, you know, background of running before we start migrations.
-
-  [medium] 2.44s (WER: 22%)
-  I have been working on the authentication model for about two weeks now. The worth 2.2 integration with Google and Microsoft is done but we still need to handle edge cases like token refresh fibers and session timelords.
-
-  [short] 1.29s (WER: 31%)
-  Hey, can you schedule a meeting with Brea and John for the next day at 3.30 p.m.
-
---- faster-whisper (small.en) ---
-
-  [long] 10.38s (WER: 24%)
-  So, here's what happened during yesterday's deployment, we pushed version 3.7.2 to production around 11 pm and within 15 minutes the error rate on the pavement's API spiked to about 12%. Turns out the database migration for the transaction stabled and complete properly because of a with a nightly backup job. We rolled back at ln 45, fixed migration script to use Confluent index creation and redeployed this morning. Everything is stable now but I want to add a pre-deployment checklist that verifies no background jobs and running. Before we start migrations
-
-  [medium] 7.66s (WER: 11%)
-  I have been working on the authentication module for about two weeks now. The OAuth 2.0 integration with Google and Microsoft is done, but we still need to handle edge cases like token refresh figures and session timeouts
-
-  [short] 3.97s (WER: 25%)
-  Hey, can you schedule a meeting with Brea and John for the next Thursday at 3.30pm?
-
---- faster-whisper (medium.en) ---
-
-  [long] 28.06s (WER: 23%)
-  So here's what happened during yesterday's deployment, we pushed version 3.7.2 to production around 11pm and within 15 minutes the error rate on the payment's API spiked to about 12%. Turns out the database migration was a transaction stable and complete properly because of a lock-on effect with nightly backup job. We roll back at 11.45, accept migration script to use concurrent index creation and redeploy this morning. Everything stable now but I want to add a pre-deployment checklist that verifies no background jobs are running before we start migrations.
-
-  [medium] 20.15s (WER: 14%)
-  I have been working on the authentication module for about 2 weeks now. The OAuth 2.0 integration with Google and Microsoft is done. but we still need to handle edge cases like token refresh failures and session timeouts
-
-  [short] 9.33s (WER: 25%)
-  Hey, can you schedule a meeting with Bria and John for the next Thursday at 3.30 p.m.
-
---- faster-whisper (distil-medium.en) ---
-
-  [long] 15.89s (WER: 29%)
-  So here's what happened during yesterday's deployment. The first version 3.7.2 to production around 11 PM. And within 15 minutes the error rate on the payments API spiked to about 12%. Turns out the database migration for the transaction stable and complete properly because of a log conflict with a nightly backup job. We rolled back up. We rolled back at a 1 point. So we rolled back at 11. $1.45,000,000,000,000,000,000, and redeployed this morning. Everything stable now, but I want to add a pre-deplement checklist that verifies no background jobs or running before we start migrations.
-
-  [medium] 13.48s (WER: 24%)
-  I have been working on the authentication model for about two weeks now. The O-Art 2.0 integration with Google and Microsoft is done. But we still need to handle edge cases like... and session timeouts.
-
-  [short] 6.70s (WER: 25%)
-  Hey can you schedule a meeting with Bria and John for the next Thursday at 3.30 PM?
-
---- faster-whisper (distil-large-v3) ---
-
-  [long] 26.72s (WER: 20%)
-  So here's what happened during yesterday's deployment. We pushed version 3.7.2 to production around 11 p.m. And within 15 minutes, the error rate on the payments API spiked to about 12%. Turns out the database migration for the transaction stable and complete properly because of a long conflict with a nightly backup job. rolled back at 1145 fixed the migration script to use concurrent index creation and redecorred this morning everything stable now but I want to add a pre-depriam and checklist that verifies no background jobs are running before we start migrations
-
-  [medium] 24.97s (WER: 14%)
-  I have been working on the authentication model for about two weeks now. The OAuth 2.0 integration with Google and Microsoft is done. But we still need to handle edge cases like token refresh figures. and session timeouts.
-
-  [short] 12.68s (WER: 25%)
-  Hey, can you schedule a meeting with Brea and John for the next Thursday at 3.30 p.m.
-
---- faster-whisper (large-v3-turbo) ---
-
-  [long] 26.83s (WER: 18%)
-  So here's what happened during yesterday's deployment, we pushed version 3.7.2 to production, around 11pm, and within 15 minutes the error rate on the payments API spiked to about 12%, turns out the database migration for the transactions table didn't complete properly, because of a log conflict with a nightly backup job. We rolled back at 11.45, fixed the migration script, we used concurrent index creation and redeployed this morning. Everything stable now but I want to add a pre-deployment checklist that verifies no background jobs are running Before we start migrations
-
-  [medium] 24.33s (WER: 14%)
-  I have been working on the authentication module for about two weeks now the OAuth 2.0 integration with Google and Microsoft is done but we still need to handle edge cases like token refresh failures and session timeouts
-
-  [short] 12.16s (WER: 25%)
-  Hey, can you schedule a meeting with Bria and John for the next Thursday at 3.30 p.m.
-
-================================================================================
-FULL TRANSCRIPTION OUTPUTS — GPU (RTX 3050 4GB, CUDA float16)
-================================================================================
-
---- faster-whisper (small.en) ---
-
-  [long] 4.35s (WER: 19%)
+  [long] 1.85s (WER: 19%)
   So, here's what happened during yesterday's deployment, we pushed version 3.7.2 to production around 11 pm and within 15 minutes the error rate on the pavement's API spiked to about 12%. Turns out the database migration for the transaction stabled and complete properly because of a with a nightly backup job. We rolled back at ln 45, fixed migration script to use concurrent index creation and redeployed this morning. Everything's stable now but I want to add a pre-deployment checklist that verifies no background jobs running before we start migrations.
 
-  [medium] 1.54s (WER: 11%)
-  I have been working on the authentication module for about two weeks now. The OAuth 2.0 integration with Google and Microsoft is done but we still need to handle edge cases like token refresh failures and session timeouts
+  [medium] 0.72s (WER: 8%)
+  I have been working on the authentication module for about two weeks now. The OAuth 2.0 integration with Google and Microsoft is done, but we still need to handle edge cases like token refresh failures and session timeouts
 
-  [short] 0.75s (WER: 25%)
+  [short] 0.32s (WER: 25%)
+  Hey, can you schedule a meeting with Brea and John for the next Thursday at 3.30 p.m.
+
+--- faster-whisper (small.en, beam=3, batched) ---
+
+  [long] 0.80s (WER: 27%)
+  So here's what happened during yesterday's deployment. We pushed version 3.7.2 to production around 11 p.m. And within 15 minutes, the error rate on the pavement's API spiked to about 12%. Turns out the database migration with a transaction-stable and complete property because of a lock perfect with a nightly backup job. We rolled back at ln 45, fixed migration script, reused concurrent index creation and redeployed this morning. Everything is stable now, but I want to add a pre-deployment checklist that verifies no background jobs or running. Before we start migrations
+
+  [medium] 0.55s (WER: 14%)
+  I have been working on the authentication module for about two weeks now. The OAuth 2.0 integration with Google and Microsoft is done. But we still need to handle edge cases like token refresh figures and session timeouts
+
+  [short] 0.31s (WER: 25%)
   Hey, can you schedule a meeting with Brea and John for the next Thursday at 3.30pm?

@@ -46,14 +46,19 @@ def compute_wer(reference: str, hypothesis: str) -> float:
     return d[len(ref_words)][len(hyp_words)] / len(ref_words)
 
 
-def benchmark_faster_whisper(model_size: str, audio_files: list[Path]) -> dict | None:
+def benchmark_faster_whisper(model_size: str, audio_files: list[Path],
+                             beam_size: int = 5, use_batched: bool = False) -> dict | None:
     from uttr_win.transcription.faster_whisper_provider import FasterWhisperProvider
 
-    print(f"\n  faster-whisper ({model_size})")
+    tag = f"{model_size}, beam={beam_size}" + (", batched" if use_batched else "")
+    print(f"\n  faster-whisper ({tag})")
     print(f"  {'-' * 40}")
 
     try:
-        provider = FasterWhisperProvider(model_size=model_size, device="auto", compute_type="auto")
+        provider = FasterWhisperProvider(
+            model_size=model_size, device="auto", compute_type="auto",
+            beam_size=beam_size, use_batched=use_batched,
+        )
         t0 = time.perf_counter()
         provider.prepare()
         load_time = time.perf_counter() - t0
@@ -83,7 +88,7 @@ def benchmark_faster_whisper(model_size: str, audio_files: list[Path]) -> dict |
         print(f"      -> {text[:120]}")
 
     return {
-        "name": f"faster-whisper ({model_size})",
+        "name": f"faster-whisper ({tag})",
         "load_time": load_time,
         "results": results,
     }
@@ -251,6 +256,14 @@ def main():
         "--sizes", type=str, default=None,
         help="Comma-separated faster-whisper sizes to test (default: all)",
     )
+    parser.add_argument(
+        "--beam-sizes", type=str, default=None,
+        help="Comma-separated beam sizes to sweep (faster-whisper only, e.g. '1,2,3,4,5')",
+    )
+    parser.add_argument(
+        "--batched", action="store_true",
+        help="Also run each faster-whisper config with BatchedInferencePipeline",
+    )
     args = parser.parse_args()
 
     audio_dir = args.audio_dir
@@ -266,13 +279,19 @@ def main():
 
     if "fw" in providers or "all" in providers:
         sizes = args.sizes.split(",") if args.sizes else FASTER_WHISPER_SIZES
+        beams = [int(b) for b in args.beam_sizes.split(",")] if args.beam_sizes else [5]
+        batched_modes = [False, True] if args.batched else [False]
         print(f"\n{'=' * 60}")
-        print(f"FASTER-WHISPER — testing {len(sizes)} model sizes")
+        print(f"FASTER-WHISPER — {len(sizes)} sizes x {len(beams)} beams x {len(batched_modes)} batch modes")
         print(f"{'=' * 60}")
         for size in sizes:
-            result = benchmark_faster_whisper(size.strip(), wav_files)
-            if result:
-                all_results.append(result)
+            for beam in beams:
+                for batched in batched_modes:
+                    result = benchmark_faster_whisper(
+                        size.strip(), wav_files, beam_size=beam, use_batched=batched,
+                    )
+                    if result:
+                        all_results.append(result)
 
     if "nemo" in providers or "all" in providers:
         print(f"\n{'=' * 60}")

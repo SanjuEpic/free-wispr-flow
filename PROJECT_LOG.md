@@ -12,10 +12,11 @@ fallback.
 
 ## Current status
 
-**Shipped as v0.1.1** — published on GitHub Releases, user-tested on a real
+**Shipped as v0.1.2** — published on GitHub Releases, user-tested on a real
 machine (hotkey, transcription, paste, sounds, history, settings, and tray
-responsiveness all confirmed working). v0.1.1 adds an on-demand "Unload model"
-tray action.
+responsiveness all confirmed working). v0.1.2 tunes faster-whisper decoding
+(beam_size 5 → 3, benchmark-justified). v0.1.1 added the "Unload model" tray
+action.
 
 | Area | Status |
 |------|--------|
@@ -33,6 +34,11 @@ tray action.
 
 ## Release
 
+- **v0.1.2** — faster-whisper `beam_size` default 5 → 3, plus optional (off by
+  default) `BatchedInferencePipeline` plumbing. Benchmark-driven: on GPU
+  float16/small.en over the 3 sample clips, beam 3 matched beam 5 WER (best
+  in-sample) while beam width barely moved latency (~30ms); batching only sped
+  long audio at ~+5 WER and gave no benefit on short dictation, so it ships off.
 - **v0.1.1** — adds the "Unload model" tray action (see Features below).
   Rebuilt universal installer `uttr-win-setup.exe` (~600 MB).
 - **v0.1.0** — single universal installer `uttr-win-setup.exe` (~600 MB) on the

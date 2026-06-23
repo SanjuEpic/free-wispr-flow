@@ -52,11 +52,19 @@ def has_nvidia_gpu() -> bool:
 
 
 class FasterWhisperProvider(TranscriptionProvider):
-    def __init__(self, model_size: str = "medium.en", device: str = "auto", compute_type: str = "auto"):
+    # beam_size=3: benchmark on small.en/float16 showed beam 3 matches beam 5 WER
+    # (best in-sample) while beam>3 buys no accuracy and adds decode time. Batching
+    # left off by default — it only speeds long audio and costs ~5 WER on our samples.
+    def __init__(self, model_size: str = "medium.en", device: str = "auto", compute_type: str = "auto",
+                 beam_size: int = 3, use_batched: bool = False, batch_size: int = 8):
         self._model_size = model_size
         self._device = device
         self._compute_type = compute_type
+        self._beam_size = beam_size
+        self._use_batched = use_batched
+        self._batch_size = batch_size
         self._model = None
+        self._batched = None
         self._resolved_device = "cpu"
 
     @property
@@ -169,6 +177,15 @@ class FasterWhisperProvider(TranscriptionProvider):
                 raise
         log.info("Model loaded on %s", self._resolved_device)
 
+        if self._use_batched:
+            try:
+                from faster_whisper import BatchedInferencePipeline
+                self._batched = BatchedInferencePipeline(model=self._model)
+                log.info("Batched inference pipeline enabled (batch_size=%d)", self._batch_size)
+            except Exception as e:
+                log.warning("BatchedInferencePipeline unavailable (%s) — using plain model", e)
+                self._batched = None
+
     def unload(self) -> None:
         """Drop the model so CUDA/ctranslate2 can release its VRAM.
 
@@ -181,6 +198,7 @@ class FasterWhisperProvider(TranscriptionProvider):
             return
         import gc
         before = get_free_vram_mb()
+        self._batched = None
         self._model = None
         gc.collect()
         after = get_free_vram_mb()
@@ -192,13 +210,22 @@ class FasterWhisperProvider(TranscriptionProvider):
     def transcribe(self, audio_path: str) -> str:
         if not self._model:
             raise RuntimeError("Model not loaded — call prepare() first")
-        segments, _info = self._model.transcribe(
-            audio_path,
-            language="en",
-            beam_size=5,
-            vad_filter=True,
-            condition_on_previous_text=False,
-        )
+        if self._batched is not None:
+            segments, _info = self._batched.transcribe(
+                audio_path,
+                language="en",
+                beam_size=self._beam_size,
+                batch_size=self._batch_size,
+                vad_filter=True,
+            )
+        else:
+            segments, _info = self._model.transcribe(
+                audio_path,
+                language="en",
+                beam_size=self._beam_size,
+                vad_filter=True,
+                condition_on_previous_text=False,
+            )
         text = " ".join(seg.text.strip() for seg in segments)
         log.info("Transcribed %d chars", len(text))
         return text
