@@ -11,6 +11,7 @@ Place .wav files in benchmarks/samples/ with matching .txt reference files.
 """
 
 import argparse
+import re
 import sys
 import time
 from pathlib import Path
@@ -28,9 +29,18 @@ FASTER_WHISPER_SIZES = [
 ]
 
 
+# Strip punctuation so provider styling (Whisper vs Parakeet capitalize/punctuate
+# differently) doesn't inflate WER. Applied to BOTH reference and hypothesis for all
+# providers — keep apostrophes inside words (don't -> dont stays consistent).
+def normalize(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^\w\s']", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def compute_wer(reference: str, hypothesis: str) -> float:
-    ref_words = reference.lower().split()
-    hyp_words = hypothesis.lower().split()
+    ref_words = normalize(reference).split()
+    hyp_words = normalize(hypothesis).split()
     if not ref_words:
         return 0.0 if not hyp_words else 1.0
 
@@ -180,6 +190,83 @@ def benchmark_onnx(audio_files: list[Path]) -> dict | None:
     }
 
 
+PK_DIR = Path(__file__).parent / "parakeet_cpp"
+PK_CLI_CPU = PK_DIR / "bin" / "cpu" / "parakeet-cli.exe"
+PK_CLI_CUDA = PK_DIR / "bin" / "cuda" / "parakeet-v0.3.2-bin-win-cuda-x64" / "parakeet-cli.exe"
+
+# (gguf filename, decoder) — rnnt uses its default decoder, tdt must be forced.
+PK_MODELS = [
+    ("rnnt-0.6b-f16.gguf", None),
+    ("rnnt-0.6b-q8_0.gguf", None),
+    ("tdt-0.6b-v2-f16.gguf", "tdt"),
+    ("tdt-0.6b-v2-q8_0.gguf", "tdt"),
+]
+
+
+def benchmark_parakeet_cpp(model_file: str, decoder: str | None, device: str,
+                           audio_files: list[Path]) -> dict | None:
+    import json
+    import os
+    import subprocess
+
+    cli = PK_CLI_CUDA if device == "cuda" else PK_CLI_CPU
+    model_path = PK_DIR / "models" / model_file
+    pk_device = "CUDA0" if device == "cuda" else "cpu"
+    tag = f"{model_file.replace('.gguf','')} [{device}]"
+    print(f"\n  parakeet.cpp ({tag})")
+    print(f"  {'-' * 40}")
+
+    if not cli.exists() or not model_path.exists():
+        print(f"  SKIPPED: missing {cli if not cli.exists() else model_path}")
+        return None
+
+    # bench loads the model once, transcribes each file, reports load_ms + per-file
+    # proc_ms + text. Manifest = one absolute wav path per line.
+    manifest = PK_DIR / f"_man_{device}.txt"
+    manifest.write_text("\n".join(str(w.resolve()).replace("\\", "/") for w in audio_files),
+                        encoding="utf-8")
+    out_json = PK_DIR / f"_bench_{model_file}_{device}.json"
+
+    cmd = [str(cli), "bench", "--model", str(model_path),
+           "--manifest", str(manifest), "--json", str(out_json)]
+    if decoder:
+        cmd += ["--decoder", decoder]
+
+    env = {**os.environ, "PARAKEET_DEVICE": pk_device}
+    try:
+        subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=600, check=True)
+        data = json.loads(out_json.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"  FAILED: {e}")
+        return None
+
+    load_time = data.get("load_ms", 0) / 1000
+    print(f"  Model load: {load_time:.2f}s")
+
+    by_path = {Path(f["path"]).stem: f for f in data.get("files", [])}
+    results = []
+    for wav in audio_files:
+        f = by_path.get(wav.stem)
+        if not f:
+            continue
+        ref_file = wav.with_suffix(".txt")
+        reference = ref_file.read_text(encoding="utf-8").strip() if ref_file.exists() else None
+        text = f.get("text", "")
+        latency = f.get("proc_ms", 0) / 1000
+        wer = compute_wer(reference, text) if reference else None
+        results.append({"file": wav.stem, "latency": latency, "wer": wer, "text": text})
+
+        wer_str = f"WER={wer:.1%}" if wer is not None else "no ref"
+        print(f"    {wav.stem}: {latency:.2f}s | {wer_str}")
+        print(f"      -> {text[:120]}")
+
+    return {
+        "name": f"parakeet.cpp ({tag})",
+        "load_time": load_time,
+        "results": results,
+    }
+
+
 def print_summary(all_results: list[dict], output_path: Path | None = None):
     lines = []
 
@@ -264,6 +351,10 @@ def main():
         "--batched", action="store_true",
         help="Also run each faster-whisper config with BatchedInferencePipeline",
     )
+    parser.add_argument(
+        "--pk-device", type=str, default="both",
+        help="parakeet.cpp device(s): 'cpu', 'cuda', or 'both' (default)",
+    )
     args = parser.parse_args()
 
     audio_dir = args.audio_dir
@@ -292,6 +383,17 @@ def main():
                     )
                     if result:
                         all_results.append(result)
+
+    if "parakeet" in providers or "all" in providers:
+        devices = ["cpu", "cuda"] if args.pk_device == "both" else [args.pk_device]
+        print(f"\n{'=' * 60}")
+        print(f"PARAKEET.CPP — {len(PK_MODELS)} models x {len(devices)} device(s)")
+        print(f"{'=' * 60}")
+        for device in devices:
+            for model_file, decoder in PK_MODELS:
+                result = benchmark_parakeet_cpp(model_file, decoder, device, wav_files)
+                if result:
+                    all_results.append(result)
 
     if "nemo" in providers or "all" in providers:
         print(f"\n{'=' * 60}")

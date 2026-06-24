@@ -25,6 +25,11 @@ Logs/
 
 # Benchmark audio recordings (large, user-specific)
 benchmarks/samples/*.wav
+# golden-set audio (large); keep the .txt ground-truth references
+benchmarks/golden/*.wav
+
+# parakeet.cpp binaries, GGUF weights (downloaded, not source; evaluated & dropped)
+benchmarks/parakeet_cpp/
 
 # macOS
 .DS_Store
