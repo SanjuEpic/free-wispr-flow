@@ -11,7 +11,7 @@
 
 [Setup]
 AppName=uttr-win
-AppVersion=0.1.0
+AppVersion=0.1.1
 AppPublisher=uttr-win
 AppPublisherURL=https://github.com/SanjuEpic/free-wispr-flow
 DefaultDirName={autopf}\uttr-win
