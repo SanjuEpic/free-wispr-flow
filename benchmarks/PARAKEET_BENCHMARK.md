@@ -106,6 +106,9 @@ daily driver; faster-whisper remains the pick when output cleanliness outweighs 
 - Dataset A is n=3 (self-recorded); the short clip's 35% is one 17-word utterance where
   two errors dominate. Directional, not definitive.
 - LibriSpeech is clean audiobook read speech — limited validity for noisy/accented input.
+- WER normalization strips punctuation but not ITN differences; `"3:30 PM"` (ref/whisper)
+  vs `"three thirty"` (parakeet) is scored as errors. That penalty is *legitimate* for a
+  dictation app (users want the written form) but is a representation gap, not pure ASR error.
 
 ## Decision (2026-06-24): not adopting Parakeet — staying on faster-whisper
 
@@ -134,9 +137,6 @@ the benefit (latency/soft-speech edges we don't need on GPU). The provider code 
 reverted; this benchmark and these notes are kept as the record of *why*. Revisit only if
 a **CPU-only** or **soft-speech** use case becomes a real priority — that's where Parakeet
 would actually earn its place.
-- WER normalization strips punctuation but not ITN differences; `"3:30 PM"` (ref/whisper)
-  vs `"three thirty"` (parakeet) is scored as errors. That penalty is *legitimate* for a
-  dictation app (users want the written form) but is a representation gap, not pure ASR error.
 
 ## Reproduce
 ```
