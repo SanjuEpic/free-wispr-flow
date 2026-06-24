@@ -52,11 +52,11 @@ def has_nvidia_gpu() -> bool:
 
 
 class FasterWhisperProvider(TranscriptionProvider):
-    # beam_size=3: benchmark on small.en/float16 showed beam 3 matches beam 5 WER
-    # (best in-sample) while beam>3 buys no accuracy and adds decode time. Batching
-    # left off by default — it only speeds long audio and costs ~5 WER on our samples.
+    # beam_size=5: live use showed beam 3 (the v0.1.2 tune) gave noticeably worse
+    # output quality than beam 5 despite a small in-sample WER edge, so we reverted.
+    # Batching left off by default — it only speeds long audio and costs ~5 WER.
     def __init__(self, model_size: str = "medium.en", device: str = "auto", compute_type: str = "auto",
-                 beam_size: int = 3, use_batched: bool = False, batch_size: int = 8):
+                 beam_size: int = 5, use_batched: bool = False, batch_size: int = 8):
         self._model_size = model_size
         self._device = device
         self._compute_type = compute_type
