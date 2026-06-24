@@ -52,6 +52,18 @@ action.
 
 ## Key decisions
 
+- **Parakeet (parakeet.cpp) evaluated and rejected for now.** Built a working
+  `parakeet.cpp` (GGUF `tdt-0.6b-v2-q8`) provider and a universal bundle, then
+  real-world live-mic tested it against faster-whisper `small.en` on the RTX 3050.
+  Verdict: **not worth shipping.** On GPU the two were ~on par for latency and
+  accuracy, but Parakeet used **~2× the VRAM** (~1.3 GB vs ~0.6 GB) for no speed
+  win, and was **inconsistent on numbers** — e.g. it would render "1.3" as words
+  one time and digits the next, where faster-whisper is reliably correct.
+  Parakeet's only real edges were CPU latency (~2–3 s vs whisper ~5–8 s) and
+  catching soft/whispered speech (no VAD gate), neither of which justified the
+  extra GPU cost, the +1.4 GB installer, and the output inconsistency. The
+  provider code was reverted; faster-whisper remains the sole engine. Revisit
+  only if a CPU-only or soft-speech use case becomes a priority.
 - **Hotkey = Ctrl+Space.** Earlier tried `Alt+Win+Space` — failed: `Alt+Space`
   is a reserved Windows system shortcut (opens the window system menu), and
   `Win`-combos are partly reserved on Win11. `Ctrl+D` was rejected (browser
